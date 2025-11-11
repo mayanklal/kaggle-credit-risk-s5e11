@@ -1,0 +1,371 @@
+---
+title: "EDA - Credit Risk Model"
+author: "Mayank Lal"
+date: today
+format: html
+execute:
+  echo: false
+  include: false
+  warning: false
+---
+
+```{r setup}
+library(tidyverse) # Data Manipulation and Visualizaton
+library(data.table) # Large datasets
+library(vtable) # Formatted Summary Table
+```
+```{r data}
+train <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/train.csv")
+test <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/test.csv")
+```
+
+```{r structure}
+# Check the structure
+str(train)
+```
+
+## Overview
+
+There are **593994** observations (unique accounts) with **thirteen** features:
+
+  * ID
+  * Annual Income
+  * Debt to Income Ratio
+  * Credit Score
+  * Loan Amount
+  * Interest Rate
+  * Gender
+  * Martial Status
+  * Education Level
+  * Employment Status
+  * Loan Purpose
+  * Grade Sub-grade
+  * Loan Paid Back (Target Variable)
+  
+## Data Summary
+```{r var_types}
+train_num <- train %>% select(where(is.numeric))
+train_char <- train %>% select(where(is.character))
+```
+
+We will look at the summary statistics of all variables. First, let's have a look at the summary statistics of **numeric variables** in the dataset.
+
+```{r preprocess}
+# Check for duplicate rows in the dataset
+train_duplicates <- train %>%
+                      add_count(id) %>%
+                      filter(n>1) %>%
+                      distinct() 
+# There are no duplicates in the dataset.
+```
+
+```{r summary_numeric, include = TRUE}
+st(train_num, 
+   summ = list(
+     c('notNA(x)','countNA(x)','mean(x)','sd(x)','min(x)','max(x)')
+   ),
+   summ.names = list(
+     c('N','Missing','Mean','Std. Dev.','Min','Max')
+   ),
+   title = "Summary Statistics of Numeric Variables")
+```
+
+
+As seen from the above table, there are five numeric features - Annual Income, Debt to Income Ratio, Credit Score, Loan Amount and Interest Rate - that can be seen as predictor variables. Out of these five predictor variables, three variables - _DTI, Credit Score and Interest Rate_ - can be further binned to represent different bands. While we need to look at correlation between DTI, Annual Income and Loan Amount, we also can derive another feature by taking ratio of Loan Amount to Annual Income.
+
+In addtion to these variables, there is one unique identifier variable, ID, that represents unique customers and can be used to remove duplicates from the dataset.
+
+Finally, there is target variable - Loan Paid Back -  which we are going to model in our classification models.
+
+Let's have a look at summary statistics of **factor variables**.
+```{r summary_cat, include = TRUE}
+# Convert all character variables to factors
+char_vars <- colnames(train_char)
+train_char <- train_char %>% mutate_if(is.character, as.factor)
+st(train_char,
+   title = "Summary Statistics of Character Variables")
+```
+
+As seen from above table, there are six character variables - _Gender, Marital Status, Education Level, Employment Status, Loan Purpose and Grade Sub-grade_.
+
+Loan Purpose and Grade Sub-grade has more than five levels and needs to be rationalized to lower number of categories. 
+
+## Univariate Analysis
+
+In Univariate Analysis, we look at the distribution of predictor variables - both numeric and character.
+
+### Distribution of Target Variable
+
+Loan Paid Back (**loan_paid_back**) is the target variable for our classification models. This means that our objective is to predict the probability of a customer to pay back his/her/their loan. Let's have a look at its distribution.
+
+```{r target_variable, include = TRUE}
+# Plot target variable - Right Skewed
+train %>% ggplot(aes(x = loan_paid_back)) +
+  geom_bar()
+```
+
+It is right-skewed distribution. Mostly belongs to loan paid back category. As it is a skewed dataset, we need to apply undersampling or
+oversampling.
+
+### Distribution of numeric variables
+
+There are five numeric variables in the dataset. Let's have a look
+at their histogram.
+
+```{r numeric_dist, include = TRUE}
+# Plot histogram of annual_income
+train %>% ggplot(aes(x = annual_income)) +
+  geom_histogram()
+
+# Plot histogram of DTI
+train %>% ggplot(aes(x = debt_to_income_ratio)) +
+  geom_histogram()
+
+# Plot histogram of credit_score
+train %>% ggplot(aes(credit_score)) +
+  geom_histogram()
+
+# Plot histogram of loan_amount
+train %>% ggplot(aes(loan_amount)) +
+  geom_histogram()
+
+# Plot histogram of interest
+train %>% ggplot(aes(interest_rate)) +
+  geom_histogram()
+```
+
+**Summary of numeric variables**:
+
+* Annual Income is left-skewed.
+* Debt to Income Ratio is left-skewed.
+* Credit Score is normal distributed with skewness towards right and outliers towards left as well.
+* Loan Amount is skewed towards left with a long right tail.
+* Interest Rate is normally distributed.
+
+### Distribution of categorical variables
+
+There are six categorical variables in the dataset. Let's have a look look at their bar plot.
+
+```{r cat_dist, include = TRUE}
+# Plot bar plot of gender 
+train %>% ggplot(aes(gender)) +
+  geom_bar()
+
+# Plot bar plot of Marital Status
+train %>% ggplot(aes(marital_status)) +
+  geom_bar()
+
+# Plot bar plot of educational level
+train %>% ggplot(aes(education_level)) +
+  geom_bar()
+
+# Plot bar plot of employment_status
+train %>% ggplot(aes(employment_status)) +
+  geom_bar()
+
+# Plot bar plot of loan purpose
+train %>% ggplot(aes(loan_purpose)) +
+  geom_bar()
+
+# Plot bar plot of grade subgrade
+train %>% ggplot(aes(grade_subgrade)) + 
+  geom_bar()
+```
+
+**Summary of categorical variables**:
+
+* Gender is nearly equally distributed between male and female. Few accounts are there in other as well.
+* Marital Status is nearly equally distributed between married and single. Other two categories are Divorced and Widowed.
+* Education Level has five levels. Majority of the accounts are in Bachelor's, High School and Masters. Two other categories are PhD and Other.
+* Employment Status has five levels. Majority of the customers are employed.
+* Loan Purpose is dominated by Debt consolidation. In additon, there are seven more categories which can be combined into one category.
+* There are grades with subgrades as well. Grades are from A to F. Each grade has five sub-levels as well. Most of the accounts are in C and D grade. Granularity can be reduced.
+* One key finding is that 55% of the loans have been taken for **Debt consolidation**. This means that they have been taken out a new loan to pay off multiple existing debts.
+
+## Bivariate Analysis
+
+In bivariate analysis, we will look at the relationship between predictor variables and target variable.
+
+### Debt to Income Ratio x Loan Paid Back
+
+**Debt to Income Ratio** is a ratio of total debt payments divided by gross income (before tax) expressed as percentage, usually on either a monthly or annual basis.
+
+It is one of the most important feature to understand the credit risk from an applicant.
+
+Let's have a look at its relationship with regards to the target variable.
+
+```{r dti, include = TRUE}
+train$loan_paid_back <- as.factor(train$loan_paid_back)
+train %>%
+    select(debt_to_income_ratio, loan_paid_back) %>%
+    ggplot(aes(loan_paid_back, debt_to_income_ratio)) +
+    geom_violin() +
+    geom_boxplot(width = 0.1)
+```
+
+As we can see for the chart above, the distribution of DTI is skewed more towards left when Loan Paid Back is 1. Also, the median value is lower for accounts that paid back their loans. It is in line with business expectation that the accounts with higher DTI have lower probability of paying back their loan.
+
+### Credit Score x Loan Paid Back
+
+**Credit Score** is an indicator of an individual's creditworthiness (ability to pay a loan back on time). 
+
+It is generally provided by external credit agencies to a financial institution and is one of the key metric to evaluate credit risk of an individual/applicant.
+
+Let's have a look at its relationship with regards to the target variable.
+
+```{r credit_score, include = TRUE}
+train %>%
+    select(credit_score, loan_paid_back) %>%
+    ggplot(aes(loan_paid_back, credit_score)) +
+    geom_violin() +
+    geom_boxplot(width = 0.1)
+```
+
+As we can see for the chart above, the median credit score of customers who paid back their loan is higher than customers who didn't pay back their loan. From their distribution, we can also infer that lower credit score customers are in higher concentration in the bucket where customer didn't pay back their loans.
+
+### Interest Rate x Loan Paid Back
+
+**Interest Rate** is the amount of interest due per period, as a proportion of the amount lent, deposited, or borrowed.  
+
+It is generally decided by the financial institution as a function of central bank's lending rate to the bank and credit worthiness of the customer/applicant.
+
+Let's have a look at its relationship with regards to the target variable.
+
+```{r interest_rate, include = TRUE}
+train %>%
+    select(interest_rate, loan_paid_back) %>%
+    ggplot(aes(loan_paid_back, interest_rate)) +
+    geom_violin() +
+    geom_boxplot(width = 0.1)
+```
+
+As we can see for the chart above, the median credit score of the customers who paid back their loan is very close (slightly higher) to customers who didn't pay back their loan. From their distribution, it doesn't seem to have a good predicitive power.
+
+### Loan Amount x Loan Paid Back
+
+**Loan Amount** is the amount that has been borrowed by the customer.
+
+My priori is that this variable doesn't have enough predicitive power on its own. But with another variable like annual income, it might have better predicitive power. On the least, I expect that the accounts with higher loan amount will have higher likelihood of defaulting on loan payment.
+
+Let's have a look at its relationship with regards to the target variable.
+
+```{r loan_amount, include = TRUE}
+train %>%
+    select(loan_amount, loan_paid_back) %>%
+    ggplot(aes(loan_paid_back, loan_amount)) +
+    geom_violin() +
+    geom_boxplot(width = 0.1)
+```
+
+As we can see for the chart above, the median loan amount as well as its distribution of the customers who paid back their loan is very close to customers who didn't pay back their loan. As expected, it doesn't seem to have a good predicitive power.
+
+### Annual Income x Loan Paid Back
+
+**Annual Income** is the total amount of money an individual or business earns in a year from all sources, such as salary, bonuses, investments, and other earnings, before any deductions are taken.
+
+My priori is for this variable is same as that of Loan Amount. On the least, I expect that the accounts with higher annual income will have higher likelihood of repaying their loan.
+
+Let's have a look at its relationship with regards to the target variable.
+
+```{r annual_income, include = TRUE}
+train %>%
+    select(annual_income, loan_paid_back) %>%
+    ggplot(aes(loan_paid_back, annual_income)) +
+    geom_violin() +
+    geom_boxplot(width = 0.1)
+```
+
+As we can see for the chart above, the median annual income as well as its distribution of the customers who paid back their loan is very close to customers who didn't pay back their loan. As expected, it doesn't seem to have a good predicitive power.
+
+### Gender x Loan Paid Back
+
+Looking at **Gender** and its relationship with regards to the target variable can help us understand if probability of repayment of loan is better for women than men. The priori is based on research that shows women tend to exhibit more prudent financial behaviors in some areas, such as saving and long-term planning, while men tend to take more risks with investments.
+
+Let's have a look at the chart below.
+
+```{r gender, include = TRUE}
+train %>%
+    select(gender, loan_paid_back) %>%
+    ggplot(aes(loan_paid_back, gender)) +
+    geom_count()
+```
+
+As we can see for the chart above, there doesn't seem to be any difference in the likelihood of loan repayment due to gender.
+
+### Marital Status x Loan Paid Back
+
+Looking at **Marital Status** and its relationship with regards to the target variable can help us understand if probability of repayment of loan is better for customers with family. The priori is based on research that shows folks with families will be more prudent in their financial behaviors.
+
+Let's have a look at the chart below.
+
+```{r marital_status, include = TRUE}
+train %>%
+    select(marital_status, loan_paid_back) %>%
+    ggplot(aes(loan_paid_back, marital_status)) +
+    geom_count()
+```
+
+As we can see for the chart above, there doesn't seem to be any difference in the likelihood of loan repayment due to marital status.
+
+
+### Education Level x Loan Paid Back
+
+Looking at **Education Level** and its relationship with regards to the target variable can help us understand if probability of repayment of loan is better for customers with higher education levels. The priori is based on research that shows folks with better education levels will be more prudent in their financial behaviors.
+
+Let's have a look at the chart below.
+
+```{r education_level, include = TRUE}
+train %>%
+    select(education_level, loan_paid_back) %>%
+    ggplot(aes(loan_paid_back, education_level)) +
+    geom_count()
+```
+
+As we can see for the chart above, there doesn't seem to be any difference in the likelihood of loan repayment due to education level.
+
+### Employment Status x Loan Paid Back
+
+Looking at **Employment Status** and its relationship with regards to the target variable can help us understand if probability of repayment of loan is better for customers with employment. The priori is based on research that shows folks with employment will be more prudent in their financial behaviors.
+
+Let's have a look at the chart below.
+
+```{r employment_status, include = TRUE}
+train %>%
+    select(employment_status, loan_paid_back) %>%
+    ggplot(aes(loan_paid_back, employment_status)) +
+    geom_count()
+```
+
+As we can see for the chart above, customers who are unemployed or student are less likely to pay back their loan.
+
+### Loan Purpose x Loan Paid Back
+
+As the name suggests, **Loan Purpose** tells us the purpose for which the customer has taken their loan. Given what we have seen in univariate analysis, majority of customer have taken their loan to repay their earlier loans. 
+
+Let's see if the other categories show difference between both classes of target variable.
+
+```{r loan_purpose, include = TRUE}
+train %>%
+    select(loan_purpose, loan_paid_back) %>%
+    ggplot(aes(loan_paid_back, loan_purpose)) +
+    geom_count()
+```
+
+From the chart above, it doesn't seem that the other categories can help us distinguish between the two classes of our target variable. So, it is safe to say that we can combine other categories into one.
+
+### Grade with Sub-grade x Loan Paid Back
+
+Like Credit Score, Loan grades and subgrades are a classification system used by lenders to assess the credit risk of a borrower.
+
+The priori is here that the loan grades like A denotes high quality loans. So there is high likelihood of repayment by these set of loans.
+
+Let's see if the data validates our priori.
+
+```{r grade_subgrade, include = TRUE}
+train %>%
+    select(grade_subgrade, loan_paid_back) %>%
+    ggplot(aes(loan_paid_back, grade_subgrade)) +
+    geom_count()
+```
+
+From the chart above, it looks that the likelihood of repayment worsens as we go from higher grade to lower grade. Also, we can reduce the number of categories here by combining subgrades into one grade.
