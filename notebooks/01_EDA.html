@@ -7,9 +7,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Mayank Lal">
-<meta name="dcterms.date" content="2025-11-11">
+<meta name="dcterms.date" content="2025-11-13">
 
-<title>EDA - Credit Risk Model</title>
+<title>Credit Risk Scorecard Model - EDA</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -36,7 +36,7 @@ ul.task-list li input[type="checkbox"] {
 <link href="01_EDA_files/libs/quarto-html/quarto-syntax-highlighting-7b89279ff1a6dce999919e0e67d4d9ec.css" rel="stylesheet" id="quarto-text-highlighting-styles">
 <script src="01_EDA_files/libs/bootstrap/bootstrap.min.js"></script>
 <link href="01_EDA_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
-<link href="01_EDA_files/libs/bootstrap/bootstrap-f710eca6107480ebccacaa260baf2e93.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<link href="01_EDA_files/libs/bootstrap/bootstrap-b58ec4c17b101be5dd00f3f7fbc7c95b.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
 <script src="01_EDA_files/libs/kePrint-0.0.1/kePrint.js"></script>
 <link href="01_EDA_files/libs/lightable-0.0.1/lightable.css" rel="stylesheet">
 
@@ -51,7 +51,7 @@ ul.task-list li input[type="checkbox"] {
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<h1 class="title">EDA - Credit Risk Model</h1>
+<h1 class="title">Credit Risk Scorecard Model - EDA</h1>
 </div>
 
 
@@ -68,7 +68,7 @@ ul.task-list li input[type="checkbox"] {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">November 11, 2025</p>
+      <p class="date">November 13, 2025</p>
     </div>
   </div>
   
@@ -519,11 +519,11 @@ ul.task-list li input[type="checkbox"] {
 <section id="distribution-of-target-variable" class="level3">
 <h3 class="anchored" data-anchor-id="distribution-of-target-variable">Distribution of Target Variable</h3>
 <p>Loan Paid Back (<strong>loan_paid_back</strong>) is the target variable for our classification models. This means that our objective is to predict the probability of a customer to pay back his/her/their loan. Let’s have a look at its distribution.</p>
-<div class="cell">
+<div class="cell" data-layout-align="center">
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/target_variable-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/target_variable-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
@@ -533,39 +533,39 @@ ul.task-list li input[type="checkbox"] {
 <section id="distribution-of-numeric-variables" class="level3">
 <h3 class="anchored" data-anchor-id="distribution-of-numeric-variables">Distribution of numeric variables</h3>
 <p>There are five numeric variables in the dataset. Let’s have a look at their histogram.</p>
-<div class="cell">
+<div class="cell" data-layout-align="center">
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/numeric_dist-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/numeric_dist-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/numeric_dist-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/numeric_dist-2.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/numeric_dist-3.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/numeric_dist-3.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/numeric_dist-4.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/numeric_dist-4.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/numeric_dist-5.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/numeric_dist-5.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
@@ -582,46 +582,46 @@ ul.task-list li input[type="checkbox"] {
 <section id="distribution-of-categorical-variables" class="level3">
 <h3 class="anchored" data-anchor-id="distribution-of-categorical-variables">Distribution of categorical variables</h3>
 <p>There are six categorical variables in the dataset. Let’s have a look look at their bar plot.</p>
-<div class="cell">
+<div class="cell" data-layout-align="center">
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/cat_dist-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/cat_dist-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/cat_dist-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/cat_dist-2.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/cat_dist-3.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/cat_dist-3.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/cat_dist-4.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/cat_dist-4.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/cat_dist-5.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/cat_dist-5.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/cat_dist-6.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/cat_dist-6.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
@@ -646,81 +646,288 @@ ul.task-list li input[type="checkbox"] {
 <p><strong>Debt to Income Ratio</strong> is a ratio of total debt payments divided by gross income (before tax) expressed as percentage, usually on either a monthly or annual basis.</p>
 <p>It is one of the most important feature to understand the credit risk from an applicant.</p>
 <p>Let’s have a look at its relationship with regards to the target variable.</p>
-<div class="cell">
+<div class="cell" data-layout-align="center">
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/dti-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/dti-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
 </div>
-<p>As we can see for the chart above, the distribution of DTI is skewed more towards left when Loan Paid Back is 1. Also, the median value is lower for accounts that paid back their loans. It is in line with business expectation that the accounts with higher DTI have lower probability of paying back their loan.</p>
+<p>As we can see for the chart above, the distribution of DTI is skewed more towards left when Loan Paid Back is 1. It is in line with business expectation that the accounts with higher DTI have lower probability of paying back their loan.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/dti_outlier-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>From the box plot, it can be seen that the median debt-to-income ratio of the customers who have paid back their loan is lower than the customers who didn’t pay back their loan.</p>
 </section>
 <section id="credit-score-x-loan-paid-back" class="level3">
 <h3 class="anchored" data-anchor-id="credit-score-x-loan-paid-back">Credit Score x Loan Paid Back</h3>
 <p><strong>Credit Score</strong> is an indicator of an individual’s creditworthiness (ability to pay a loan back on time).</p>
 <p>It is generally provided by external credit agencies to a financial institution and is one of the key metric to evaluate credit risk of an individual/applicant.</p>
 <p>Let’s have a look at its relationship with regards to the target variable.</p>
-<div class="cell">
+<div class="cell" data-layout-align="center">
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/credit_score-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/credit_score-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
 </div>
-<p>As we can see for the chart above, the median credit score of customers who paid back their loan is higher than customers who didn’t pay back their loan. From their distribution, we can also infer that lower credit score customers are in higher concentration in the bucket where customer didn’t pay back their loans.</p>
+<p>As we can see for the chart above, lower credit score customers are in higher concentration in the bucket where customer didn’t pay back their loans.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/credit_score_outlier-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>From the box plot, it can be seen that the credit score of the customers who have paid back their loan is higher than the customers who didn’t pay back their loan.</p>
 </section>
 <section id="interest-rate-x-loan-paid-back" class="level3">
 <h3 class="anchored" data-anchor-id="interest-rate-x-loan-paid-back">Interest Rate x Loan Paid Back</h3>
 <p><strong>Interest Rate</strong> is the amount of interest due per period, as a proportion of the amount lent, deposited, or borrowed.</p>
 <p>It is generally decided by the financial institution as a function of central bank’s lending rate to the bank and credit worthiness of the customer/applicant.</p>
 <p>Let’s have a look at its relationship with regards to the target variable.</p>
-<div class="cell">
+<div class="cell" data-layout-align="center">
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/interest_rate-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/interest_rate-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
 </div>
-<p>As we can see for the chart above, the median credit score of the customers who paid back their loan is very close (slightly higher) to customers who didn’t pay back their loan. From their distribution, it doesn’t seem to have a good predicitive power.</p>
+<p>As we can see for the chart above, the likelihood of loan repayment goes down with higher interest rate. But given the overlap between the distirbutions, it doesn’t seem to have a good predictive power.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/interest_rate_outlier-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>From the box plot, it can be seen that the interest rate of the customers who have paid back their loan is lower than the customers who didn’t pay back their loan.</p>
 </section>
 <section id="loan-amount-x-loan-paid-back" class="level3">
 <h3 class="anchored" data-anchor-id="loan-amount-x-loan-paid-back">Loan Amount x Loan Paid Back</h3>
 <p><strong>Loan Amount</strong> is the amount that has been borrowed by the customer.</p>
 <p>My priori is that this variable doesn’t have enough predicitive power on its own. But with another variable like annual income, it might have better predicitive power. On the least, I expect that the accounts with higher loan amount will have higher likelihood of defaulting on loan payment.</p>
 <p>Let’s have a look at its relationship with regards to the target variable.</p>
-<div class="cell">
+<div class="cell" data-layout-align="center">
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/loan_amount-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/loan_amount-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
 </div>
-<p>As we can see for the chart above, the median loan amount as well as its distribution of the customers who paid back their loan is very close to customers who didn’t pay back their loan. As expected, it doesn’t seem to have a good predicitive power.</p>
+<p>As we can see for the chart above, the distribution of the customers who paid back their loan is very close to customers who didn’t pay back their loan. As expected, it doesn’t seem to have a good predictive power.</p>
 </section>
 <section id="annual-income-x-loan-paid-back" class="level3">
 <h3 class="anchored" data-anchor-id="annual-income-x-loan-paid-back">Annual Income x Loan Paid Back</h3>
-<p><strong>Annual Income</strong> i is the total amount of money an individual or business earns in a year from all sources, such as salary, bonuses, investments, and other earnings, before any deductions are taken.</p>
+<p><strong>Annual Income</strong> is the total amount of money an individual or business earns in a year from all sources, such as salary, bonuses, investments, and other earnings, before any deductions are taken.</p>
 <p>My priori is for this variable is same as that of Loan Amount. On the least, I expect that the accounts with higher annual income will have higher likelihood of repaying their loan.</p>
 <p>Let’s have a look at its relationship with regards to the target variable.</p>
-<div class="cell">
+<div class="cell" data-layout-align="center">
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/annual_income-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/annual_income-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
 </div>
-<p>As we can see for the chart above, the median annual income as well as its distribution of the customers who paid back their loan is very close to customers who didn’t pay back their loan. As expected, it doesn’t seem to have a good predicitive power.</p>
+<p>As we can see for the chart above, the distribution of the customers who paid back their loan is very similar to the customers who didn’t pay back their loan. As expected, it doesn’t seem to have a good predictive power.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/annual_income_outlier-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>From the box plot, it can be seen that the interest_rate of the customers who have paid back their loan is lower than the customers who didn’t pay back their loan.</p>
 </section>
+<section id="gender-x-loan-paid-back" class="level3">
+<h3 class="anchored" data-anchor-id="gender-x-loan-paid-back">Gender x Loan Paid Back</h3>
+<p>Looking at <strong>Gender</strong> and its relationship with regards to the target variable can help us understand if probability of repayment of loan is better for women than men. The priori is based on research that shows women tend to exhibit more prudent financial behaviors in some areas, such as saving and long-term planning, while men tend to take more risks with investments.</p>
+<p>Let’s have a look at the chart below.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/gender-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As we can see for the chart above, there doesn’t seem to be any difference in the likelihood of loan repayment due to gender.</p>
+</section>
+<section id="marital-status-x-loan-paid-back" class="level3">
+<h3 class="anchored" data-anchor-id="marital-status-x-loan-paid-back">Marital Status x Loan Paid Back</h3>
+<p>Looking at <strong>Marital Status</strong> and its relationship with regards to the target variable can help us understand if probability of repayment of loan is better for customers with family. The priori is based on research that shows folks with families will be more prudent in their financial behaviors.</p>
+<p>Let’s have a look at the chart below.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/marital_status-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As we can see for the chart above, there doesn’t seem to be any difference in the likelihood of loan repayment due to marital status.</p>
+</section>
+<section id="education-level-x-loan-paid-back" class="level3">
+<h3 class="anchored" data-anchor-id="education-level-x-loan-paid-back">Education Level x Loan Paid Back</h3>
+<p>Looking at <strong>Education Level</strong> and its relationship with regards to the target variable can help us understand if probability of repayment of loan is better for customers with higher education levels. The priori is based on research that shows folks with better education levels will be more prudent in their financial behaviors.</p>
+<p>Let’s have a look at the chart below.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/education_level-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As we can see for the chart above, there doesn’t seem to be any difference in the likelihood of loan repayment due to education level.</p>
+</section>
+<section id="employment-status-x-loan-paid-back" class="level3">
+<h3 class="anchored" data-anchor-id="employment-status-x-loan-paid-back">Employment Status x Loan Paid Back</h3>
+<p>Looking at <strong>Employment Status</strong> and its relationship with regards to the target variable can help us understand if probability of repayment of loan is better for customers with employment. The priori is based on research that shows folks with employment will be more prudent in their financial behaviors.</p>
+<p>Let’s have a look at the chart below.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/employment_status-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As we can see for the chart above, customers who are unemployed or student are less likely to pay back their loan.</p>
+</section>
+<section id="loan-purpose-x-loan-paid-back" class="level3">
+<h3 class="anchored" data-anchor-id="loan-purpose-x-loan-paid-back">Loan Purpose x Loan Paid Back</h3>
+<p>As the name suggests, <strong>Loan Purpose</strong> tells us the purpose for which the customer has taken their loan. Given what we have seen in univariate analysis, majority of customer have taken their loan to repay their earlier loans.</p>
+<p>Let’s see if the other categories show difference between both classes of target variable.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/loan_purpose-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>From the chart above, it doesn’t seem that the other categories can help us distinguish between the two classes of our target variable. So, it is safe to say that we can combine other categories into one.</p>
+</section>
+<section id="grade-with-sub-grade-x-loan-paid-back" class="level3">
+<h3 class="anchored" data-anchor-id="grade-with-sub-grade-x-loan-paid-back">Grade with Sub-grade x Loan Paid Back</h3>
+<p>Like Credit Score, Loan grades and subgrades are a classification system used by lenders to assess the credit risk of a borrower.</p>
+<p>The priori is here that the loan grades like A denotes high quality loans. So there is high likelihood of repayment by these set of loans.</p>
+<p>Let’s see if the data validates our priori.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/grade_subgrade-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>From the chart above, it looks that the likelihood of repayment worsens as we go from higher grade to lower grade. Also, we can reduce the number of categories here by combining subgrades into one grade.</p>
+</section>
+</section>
+<section id="monotonicity-analysis" class="level2">
+<h2 class="anchored" data-anchor-id="monotonicity-analysis">Monotonicity Analysis</h2>
+<p>In this section, we will perform monotonicity analysis to check whether the relationship between each predictor and the target variable follows a consistent increasing or decreasing trend. Variables with monotonic behavior are easier to model and interpret, especially in logistic regression and credit risk scorecards.</p>
+<p>For numeric variables, the data will be binned, and the payment rate (good rate) is calculated for each bin to assess whether the trend is smooth and one directional.</p>
+<p>Let’s have a look at the monotonicity of numeric variables after quantile binning.</p>
+<section id="bubble-plot-of-debt-to-income-ratio-dti" class="level3">
+<h3 class="anchored" data-anchor-id="bubble-plot-of-debt-to-income-ratio-dti">Bubble Plot of Debt-to-Income Ratio (DTI)</h3>
+<p>First, we will look at the relationship between DTI and Good Rate (Rate of Payment of Loan).</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/dti_mono-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As it can be seen from the above chart, the loan repayment rate decreases with increasing DTI, confirming our business intiuition that higher debt burden corresponds to higher default risk.</p>
+</section>
+<section id="bubble-plot-of-credit-score" class="level3">
+<h3 class="anchored" data-anchor-id="bubble-plot-of-credit-score">Bubble Plot of Credit Score</h3>
+<p>Now, let’s look at the relationship between Credit Score and Good Rate (Rate of Payment of Loan).</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/credit_score_mono-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As it can be seen from the above chart, the loan repayment rate increases with increasing Credit Score, confirming our business intiuition that better credit score corresponds to lower default risk.</p>
+</section>
+<section id="bubble-plot-of-interest-rate" class="level3">
+<h3 class="anchored" data-anchor-id="bubble-plot-of-interest-rate">Bubble Plot of Interest Rate</h3>
+<p>Next, we will look at the relationship between Interest Rate and Good Rate (Rate of Payment of Loan).</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/interest_rate_mono-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As it can be seen from the above chart, the loan repayment rate decreases with increasing Interest Rate, confirming our business intiuition that increasing interest rate corresponds to higher default risk.</p>
+</section>
+<section id="bubble-plot-of-loan-to-income-ratio-lti" class="level3">
+<h3 class="anchored" data-anchor-id="bubble-plot-of-loan-to-income-ratio-lti">Bubble Plot of Loan to Income Ratio (LTI)</h3>
+<p>Here, instead of creating separate bubbe plots for loan amount and annual income, I have derived another variable using them called <strong>Loan to Income Ratio</strong>. As compared to DTI, LTI tells us the affordability of this specific loan. Its focus is on the capacity risk of the customer, i.e., the ability to sustain new loan. Let’s have a look at the relationship between LTI and Good Rate (Rate of Payment of Loan).</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/lti_mono-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As it can be seen from the above chart, the loan repayment rate has a non-monotonic relationship with LTI. The repayment probability first rises and then falls.</p>
+</section>
+</section>
+<section id="correlation-analysis" class="level2">
+<h2 class="anchored" data-anchor-id="correlation-analysis">Correlation Analysis</h2>
+<p>In this section, we will perform correlation analysis to identify variables that convery similar information, which can cause redundancy and instability in models. Since most numeric variables in this dataset are skewed and show monotonic rather than linear relationships, <strong>Spearman’s rank correlation</strong> is used instead of Pearson’s. It is more robust to outliers and better suited for non-nomral, monotoninc data common in credit risk modelling.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/corr-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As seen from the above chart, it can be concluded that the numeric predictors show low to moderate correlations, with credit score and DTI displaying expected opposing trends. The weak pairwise correlations indicate low redundancy, making all variables suitable for further modeling and feature selection.</p>
 </section>
 
 </main>
