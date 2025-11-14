@@ -19,6 +19,9 @@ library(data.table) # Large datasets
 library(vtable) # Formatted Summary Table
 library(corrplot) # Correlation
 library(patchwork) # Grid of plots
+library(scales) # For Percentage Labels
+library(rpart) # Simple Decision Tree for interaction analysis
+library(rpart.plot) # Plotting Decision Trees
 ```
 ```{r data}
 train <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/train.csv")
@@ -104,7 +107,7 @@ In Univariate Analysis, we look at the distribution of predictor variables - bot
 
 Loan Paid Back (**loan_paid_back**) is the target variable for our classification models. This means that our objective is to predict the probability of a customer to pay back his/her/their loan. Let's have a look at its distribution.
 
-```{r target_variable, include = TRUE}
+```{r target_variable_train, include = TRUE}
 #| fig.width: 12
 #| fig.height: 8
 #| fig.align: "center"
@@ -112,6 +115,11 @@ train <- train %>%
     mutate(loan_paid_back = factor(loan_paid_back, levels = c(1, 0)))
 train %>% ggplot(aes(x = loan_paid_back)) +
     geom_bar() +
+    labs(
+        title = "Distribution of Target Variable - Loan Paid Back",
+        x = "Loan Paid Back",
+        y = "Count"
+        ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -131,30 +139,55 @@ at their histogram.
 # Plot histogram of annual_income
 train %>% ggplot(aes(x = annual_income)) +
     geom_histogram() +
+    labs(
+        title = "Histogram of Annual Income",
+        x = "Annual Income",
+        y = "Count"
+        ) +
     scale_fill_grey() +
     theme_bw()
 
 # Plot histogram of DTI
 train %>% ggplot(aes(x = debt_to_income_ratio)) +
     geom_histogram() +
+    labs(
+        title = "Histogram of DTI",
+        x = "DTI",
+        y = "Count"
+        ) +
     scale_fill_grey() +
     theme_bw()
 
 # Plot histogram of credit_score
 train %>% ggplot(aes(credit_score)) +
     geom_histogram() +
+    labs(
+        title = "Histogram of Credit Score",
+        x = "Credit Score",
+        y = "Count"
+        ) +
     scale_fill_grey() +
     theme_bw()
 
 # Plot histogram of loan_amount
 train %>% ggplot(aes(loan_amount)) +
     geom_histogram() +
+    labs(
+        title = "Histogram of Loan Amount",
+        x = "Loan Amount",
+        y = "Count"
+        ) +
     scale_fill_grey() +
     theme_bw()
 
 # Plot histogram of interest
 train %>% ggplot(aes(interest_rate)) +
     geom_histogram() +
+    labs(
+        title = "Histogram of Interest Rate",
+        x = "Interest Rate",
+        y = "Count"
+        ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -178,36 +211,66 @@ There are six categorical variables in the dataset. Let's have a look look at th
 # Plot bar plot of gender 
 train %>% ggplot(aes(gender)) +
     geom_bar() +
+    labs(
+        title = "Distribution of Gender",
+        x = "Gender",
+        y = "Count"
+        ) +
     scale_fill_grey() +
     theme_bw()
 
 # Plot bar plot of Marital Status
 train %>% ggplot(aes(marital_status)) +
     geom_bar() +
+    labs(
+        title = "Distribution of Marital Status",
+        x = "Marital Status",
+        y = "Count"
+        ) +
     scale_fill_grey() +
     theme_bw()
 
 # Plot bar plot of educational level
 train %>% ggplot(aes(education_level)) +
     geom_bar() +
+    labs(
+        title = "Distribution of Education Level",
+        x = "Education Level",
+        y = "Count"
+        ) +
     scale_fill_grey() +
     theme_bw()
 
 # Plot bar plot of employment_status
 train %>% ggplot(aes(employment_status)) +
     geom_bar() +
+    labs(
+        title = "Distribution of Employment Status",
+        x = "Employment Status",
+        y = "Count"
+        ) +
     scale_fill_grey() +
     theme_bw()
 
 # Plot bar plot of loan purpose
 train %>% ggplot(aes(loan_purpose)) +
     geom_bar() +
+    labs(
+        title = "Distribution of Loan Purpose",
+        x = "Loan Purpose",
+        y = "Count"
+        ) +
     scale_fill_grey() +
     theme_bw()
 
 # Plot bar plot of grade subgrade
 train %>% ggplot(aes(grade_subgrade)) + 
     geom_bar() +
+    labs(
+        title = "Distribution of Grade Sub-grade",
+        x = "Grade Sub-grade",
+        y = "Count"
+        ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -241,7 +304,12 @@ Let's have a look at its relationship with regards to the target variable.
 train %>%
     select(debt_to_income_ratio, loan_paid_back) %>%
     ggplot(aes(debt_to_income_ratio, fill = loan_paid_back)) +
-    geom_density(alpha = 0.5)+
+    geom_density(alpha = 0.5) +
+    labs(
+        title = "Kernel Density Plot of DTI by Loan Paid Back",
+        x = "DTI",
+        y = "Density"
+    ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -255,7 +323,12 @@ As we can see for the chart above, the distribution of DTI is skewed more toward
 train %>%
     select(debt_to_income_ratio, loan_paid_back) %>%
     ggplot(aes(debt_to_income_ratio, loan_paid_back)) +
-    geom_boxplot()+
+    geom_boxplot() +
+    labs(
+        title = "Box Plot of DTI by Loan Paid Back",
+        x = "DTI",
+        y = "Loan Paid Back"
+    ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -277,7 +350,12 @@ Let's have a look at its relationship with regards to the target variable.
 train %>%
     select(credit_score, loan_paid_back) %>%
     ggplot(aes(credit_score, fill = loan_paid_back)) +
-    geom_density(alpha = 0.5)+
+    geom_density(alpha = 0.5) +
+    labs(
+        title = "Kernel Density Plot of Interest Credit Score by Loan Paid Back",
+        x = "Credit Score",
+        y = "Density"
+    ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -291,7 +369,12 @@ As we can see for the chart above, lower credit score customers are in higher co
 train %>%
     select(credit_score, loan_paid_back) %>%
     ggplot(aes(credit_score, loan_paid_back)) +
-    geom_boxplot()+
+    geom_boxplot() +
+    labs(
+        title = "Box Plot of Credit Score by Loan Paid Back",
+        x = "Credit Score",
+        y = "Loan Paid Back"
+    ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -314,6 +397,11 @@ train %>%
     select(interest_rate, loan_paid_back) %>%
     ggplot(aes(interest_rate, fill = loan_paid_back)) +
     geom_density(alpha = 0.5) +
+    labs(
+        title = "Kernel Density Plot of Interest Rate by Loan Paid Back",
+        x = "Interest Rate",
+        y = "Density"
+    ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -327,7 +415,12 @@ As we can see for the chart above, the likelihood of loan repayment goes down wi
 train %>%
     select(interest_rate, loan_paid_back) %>%
     ggplot(aes(interest_rate, loan_paid_back)) +
-    geom_boxplot()+
+    geom_boxplot() +
+    labs(
+        title = "Box Plot of Interest Rate by Loan Paid Back",
+        x = "Interest Rate",
+        y = "Loan Paid Back"
+    ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -350,11 +443,35 @@ train %>%
     select(loan_amount, loan_paid_back) %>%
     ggplot(aes(loan_amount, fill = loan_paid_back)) +
     geom_density(alpha = 0.5) +
+    labs(
+        title = "Kernel Density Plot of Loan Amount by Loan Paid Back",
+        x = "Loan Amount",
+        y = "Density"
+    ) +
     scale_fill_grey() +
     theme_bw()
 ```
 
 As we can see for the chart above, the distribution of the customers who paid back their loan is very close to customers who didn't pay back their loan. As expected, it doesn't seem to have a good predictive power.
+
+```{r loan_amount_outlier, include = TRUE}
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
+train %>%
+    select(loan_amount, loan_paid_back) %>%
+    ggplot(aes(loan_amount, loan_paid_back)) +
+    geom_boxplot() +
+    labs(
+        title = "Box Plot of Loan Amount by Loan Paid Back",
+        x = "Loan Amount",
+        y = "Loan Paid Back"
+    ) +
+    scale_fill_grey() +
+    theme_bw()
+```
+
+From the box plot, it can be seen that the loan amount of the customers who have paid back their loan is similar to the customers who didn't pay back their loan.
 
 ### Annual Income x Loan Paid Back
 
@@ -372,6 +489,11 @@ train %>%
     select(annual_income, loan_paid_back) %>%
     ggplot(aes(annual_income, fill = loan_paid_back)) +
     geom_density(alpha = 0.5) +
+    labs(
+        title = "Kernel Density Plot of Annual Income by Loan Paid Back",
+        x = "Annual Income",
+        y = "Density"
+    ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -386,11 +508,16 @@ train %>%
     select(annual_income, loan_paid_back) %>%
     ggplot(aes(annual_income, loan_paid_back)) +
     geom_boxplot()+
+    labs(
+        title = "Box Plot of Annual Income by Loan Paid Back",
+        x = "Annual Income",
+        y = "Loan Paid Back"
+    ) +
     scale_fill_grey() +
     theme_bw()
 ```
 
-From the box plot, it can be seen that the interest_rate of the customers who have paid back their loan is lower than the customers who didn't pay back their loan.
+From the box plot, it can be seen that the annual income of the customers who have paid back their loan is similar to the customers who didn't pay back their loan.
 
 ### Gender x Loan Paid Back
 
@@ -406,6 +533,12 @@ train %>%
     select(gender, loan_paid_back) %>%
     ggplot(aes(x = gender, fill = loan_paid_back)) +
     geom_bar(position = "dodge") +
+    labs(
+        title = "Loan Repayment Distribution by Gender",
+        x = "Gender",
+        y = "Count",
+        fill = "Loan Paid Back"
+        ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -426,6 +559,12 @@ train %>%
     select(marital_status, loan_paid_back) %>%
     ggplot(aes(x = marital_status, fill = loan_paid_back)) +
     geom_bar(position = "dodge") +
+    labs(
+        title = "Loan Repayment Distribution by Marital Status",
+        x = "Marital Status",
+        y = "Count",
+        fill = "Loan Paid Back"
+        ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -447,6 +586,12 @@ train %>%
     select(education_level, loan_paid_back) %>%
     ggplot(aes(x = education_level, fill = loan_paid_back)) +
     geom_bar(position = "dodge") +
+    labs(
+        title = "Loan Repayment Distribution by Education Level",
+        x = "Education Level",
+        y = "Count",
+        fill = "Loan Paid Back"
+        ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -459,6 +604,7 @@ Looking at **Employment Status** and its relationship with regards to the target
 
 Let's have a look at the chart below.
 
+
 ```{r employment_status, include = TRUE}
 #| fig.width: 12
 #| fig.height: 8
@@ -467,6 +613,12 @@ train %>%
     select(employment_status, loan_paid_back) %>%
     ggplot(aes(x = employment_status, fill = loan_paid_back)) +
     geom_bar(position = "dodge") +
+    labs(
+        title = "Loan Repayment Distribution by Employment Status",
+        x = "Employment Status",
+        y = "Count",
+        fill = "Loan Paid Back"
+        ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -487,6 +639,12 @@ train %>%
     select(loan_purpose, loan_paid_back) %>%
     ggplot(aes(x = loan_purpose, fill = loan_paid_back)) +
     geom_bar(position = "dodge") +
+    labs(
+        title = "Loan Repayment Distribution by Loan Purpose",
+        x = "Loan Purpose",
+        y = "Count",
+        fill = "Loan Paid Back"
+        ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -509,6 +667,12 @@ train %>%
     select(grade_subgrade, loan_paid_back) %>%
     ggplot(aes(x = grade_subgrade, fill = loan_paid_back)) +
     geom_bar(position = "dodge") +
+    labs(
+        title = "Loan Repayment Distribution by Grade Sub-grade",
+        x = "Grade Sub-grade",
+        y = "Count",
+        fill = "Loan Paid Back"
+        ) +
     scale_fill_grey() +
     theme_bw()
 ```
@@ -555,7 +719,7 @@ First, we will look at the relationship between DTI and Good Rate (Rate of Payme
 #| fig.width: 12
 #| fig.height: 8
 #| fig.align: "center"
-plot_bubble_chart <- function(data, var, target_var) {
+plot_bubble_chart <- function(data, var, target_var, title, x_label) {
 bubble_dti <- data %>%
   group_by({{var}}) %>%
   summarise(
@@ -564,13 +728,18 @@ bubble_dti <- data %>%
   ) %>%
   ggplot(aes(x = {{var}}, y = good_rate, size = count)) +
   geom_point(alpha = 0.5) +
-  scale_size(range = c(10, 20), name = "No. of Customers")
+  scale_size(range = c(10, 20), name = "No. of Customers") +
+  labs(
+        title = title,
+        x = x_label,
+        y = "Loan Repayment Rate"
+    ) +
   theme_bw() +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
 return(bubble_dti)
 }
-plot_bubble_chart(train_num_bins, DTI_Bins, loan_paid_back)
+plot_bubble_chart(train_num_bins, DTI_Bins, loan_paid_back, "Bubble Plot of DTI by Loan Repayment Rate", "Gender")
 ```
 
 As it can be seen from the above chart, the loan repayment rate decreases with increasing DTI, confirming our business intiuition that
@@ -585,7 +754,7 @@ Now, let's look at the relationship between Credit Score and Good Rate (Rate of 
 #| fig.width: 12
 #| fig.height: 8
 #| fig.align: "center"
-plot_bubble_chart(train_num_bins, CreditScore_Bins, loan_paid_back)
+plot_bubble_chart(train_num_bins, CreditScore_Bins, loan_paid_back,  "Bubble Plot of Credit Score by Loan Repayment Rate", "Gender")
 ```
 
 As it can be seen from the above chart, the loan repayment rate increases with increasing Credit Score, confirming our business intiuition that better credit score corresponds to lower default risk.
@@ -598,29 +767,111 @@ Next, we will look at the relationship between Interest Rate and Good Rate (Rate
 #| fig.width: 12
 #| fig.height: 8
 #| fig.align: "center"
-plot_bubble_chart(train_num_bins, InterestRate_Bins, loan_paid_back)
+plot_bubble_chart(train_num_bins, InterestRate_Bins, loan_paid_back,  "Bubble Plot of Interest Rate by Loan Repayment Rate", "Gender")
 ```
 
 As it can be seen from the above chart, the loan repayment rate decreases with increasing Interest Rate, confirming our business intiuition that increasing interest rate corresponds to higher default risk.
 
 ### Bubble Plot of Loan to Income Ratio (LTI)
 
-Here, instead of creating separate bubbe plots for loan amount and annual income, I have derived another variable using them called **Loan to Income Ratio**. As compared to DTI, LTI tells us the affordability of this specific loan. Its focus is on the capacity risk of the customer, i.e., the ability to sustain new loan. Let's have a look at the relationship between LTI and Good Rate (Rate of Payment of Loan). 
+Here, instead of creating separate bubble plots for loan amount and annual income, I have derived another variable using them called **Loan to Income Ratio**. As compared to DTI, LTI tells us the affordability of this specific loan. Its focus is on the capacity risk of the customer, i.e., the ability to sustain new loan. Let's have a look at the relationship between LTI and Good Rate (Rate of Payment of Loan). 
 
 ```{r lti_mono, include = TRUE}
 #| fig.width: 12
 #| fig.height: 8
 #| fig.align: "center"
-plot_bubble_chart(train_num_bins, LTI_Bins, loan_paid_back)
+plot_bubble_chart(train_num_bins, LTI_Bins, loan_paid_back,  "Bubble Plot of LTI by Loan Repayment Rate", "Gender")
 ```
 
 As it can be seen from the above chart, the loan repayment rate has a non-monotonic relationship with LTI. The repayment probability first rises and then falls.
+
+### Bubble Plot of Gender
+
+In this section, we will look at bubble plot of categorical variables. First, let's look at bubble plot of Gender.
+
+```{r gender_mono, include = TRUE}
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
+plot_bubble_chart(train, gender, loan_paid_back, "Bubble Plot of Gender by Loan Repayment Rate", "Gender")
+```
+
+As we can see from the above chart, the loan repayment rate of all three categories of gender are very close to each other as we have seen previously in the bar chart as well. This further confirms it. A general order that gets revealed is: Female > Male > Other.
+
+### Bubble Plot of Marital Status
+
+Next, we will look at bubble plot of Marital Status.
+
+```{r marital_status_mono, include = TRUE}
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
+plot_bubble_chart(train, marital_status, loan_paid_back, "Bubble Plot of Marital Status by Loan Repayment Rate", "Marital Status")
+```
+
+As we can see from the above chart, the loan repayment rate of all three categories of marital status are very close to each other as we have seen previously in the bar chart as well. This further confirms it. A general order that gets revealed is: Married > Single > Divorced > Widowed.
+
+### Bubble Plot of Education Level
+
+Now, we will look at bubble plot of Education Level.
+
+```{r education_level_mono, include = TRUE}
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
+plot_bubble_chart(train, education_level, loan_paid_back, "Bubble Plot of Education Level by Loan Repayment Rate", "Education Level")
+```
+
+As we can see from the above chart, the loan repayment rate of all three categories of education level are very close to each other as we have seen previously in the bar chart as well. This further confirms it. A general order that gets revealed is: PhD > High School > Master's > Other > Bachelor's.
+
+### Bubble Plot of Employment Status
+
+Here we will look at bubble plot of Employment Status.
+
+```{r employment_status_mono, include = TRUE}
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
+plot_bubble_chart(train, employment_status, loan_paid_back, "Bubble Plot of Employment Status by Loan Repayment Rate", "Employment Status")
+```
+
+As we can see from the above chart, the loan repayment rate of all three categories of employment status show a monotonic downward trend as we have seen previously in the bar chart as well. This further confirms it. A general order that gets revealed is: Retired > Employed > Self-employed > Student > Unemployed.
+
+### Bubble Plot of Loan Purpose
+
+In below chart, we will look at bubble plot of Loan Purpose.
+
+```{r loan_purpose_mono, include = TRUE}
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
+plot_bubble_chart(train, loan_purpose, loan_paid_back, "Bubble Plot of Loan Purpose by Loan Repayment Rate", "Loan Purpose")
+```
+
+As we can see from the above chart, the loan repayment rate of all three categories of loan purpose are very close to each other as we have seen previously in the bar chart as well. This further confirms it. 
+
+### Bubble Plot of Grade Sub-grade
+
+Finally, let's have look at bubble plot of grade sub-grade.
+
+```{r grade_subgrade_mono, include = TRUE}
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
+plot_bubble_chart(train, grade_subgrade, loan_paid_back, "Bubble Plot of Grade Sub-grade by Loan Repayment Rate", "Grade Sub-grade")
+```
+
+As we can see from the above chart, the loan repayment rate of all three categories of grade sub-grade show a clear monotonic downward trend as we have seen previously in the bar chart as well. This further confirms it. A general order that gets revealed is: A > B > C > D > E > F.
+ 
 
 ## Correlation Analysis
 
 In this section, we will perform correlation analysis to identify variables that convery similar information, which can cause redundancy and instability in models. Since most numeric variables in this dataset are skewed and show monotonic rather than linear relationships, **Spearman's rank correlation** is used instead of Pearson's. It is more robust to outliers and better suited for non-nomral, monotoninc data common in credit risk modelling.
 
 ```{r corr, include = TRUE}
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
 train_num %>%
     select(-id, -loan_amount, -annual_income, -DTI_Bins, -CreditScore_Bins, -InterestRate_Bins, -LTI_Bins) %>%
     mutate(across(everything(), as.numeric)) %>%
@@ -636,3 +887,177 @@ train_num %>%
 ```
 
 As seen from the above chart, it can be concluded that the numeric predictors show low to moderate correlations, with credit score and DTI displaying expected opposing trends. The weak pairwise correlations indicate low redundancy, making all variables suitable for further modeling and feature selection.
+
+## Interaction Analysis
+
+In this section, we will try to identify variable pairs which can have interaction between them. We will use business intuition and a simple decision tree to identify these pair of variables.
+
+```{r tree, include = TRUE}
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
+train_main <- train %>% select(-id)
+tree_model <- rpart(
+    loan_paid_back ~ .,
+    data = train_main,
+    control = rpart.control(maxdepth = 6, minsplit = 5000, cp =  0.001)
+)
+rpart.plot(tree_model, type = 2, extra = 1, under = TRUE)
+```
+
+Based on the decision tree as shown above and business intuition, we have shortlisted following pairs:
+
+- Employment Status x DTI
+- DTI x Credit Score
+- Interest Rate x Credit Score
+- Loan Purpose x LTI
+- Employment Status x Grade Sub-grade
+
+### Line Plot of Employment Status by DTI
+
+Let's start by looking at line plot to understand the interaction between Employment Status and DTI.
+
+```{r es_dti_int, include = TRUE}
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
+train_bins_char <- train_num_bins %>% select(-loan_paid_back) %>%
+                        left_join(train, by = join_by(id)) 
+train_bins_char %>%
+    group_by(employment_status, DTI_Bins) %>%
+    summarise(good_rate = mean(loan_paid_back == 1)) %>%
+    ggplot(aes(x = DTI_Bins, y = good_rate, group = employment_status, linetype = employment_status)) +
+    geom_line(color = "black") +
+    geom_point(color = "black") +
+    scale_y_continuous(
+    labels = label_percent(accuracy = 1),  # Converts 0.85 → 85%
+    limits = c(0, 1),                      # Optional: fixes y-axis from 0–100%
+    expand = expansion(mult = c(0, 0.05))) +
+    labs(
+            title = "Interaction b/w Employment Status and DTI",
+            x = "DTI",
+            y = "Loan Repayment Rate (%)"
+        ) +
+        theme_bw() +
+        theme(legend.title = element_blank())
+```
+
+As seen from the above chart, it can be clearly seen that customers with the employment status - Employed, Retired and Self-employed have higher repayment rate across DTI Bins than the customers with the employment status - Student and Unemployed.
+
+So, their interaction can help us identify customers with higher or lower default risk.
+
+### Line Plot of Loan Purpose by LTI
+
+Next, we will look at line plot to understand the interaction between Loan Purpose and LTI.
+
+```{r ls_lti_int, include = TRUE}
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
+train_bins_char %>%
+    group_by(loan_purpose, LTI_Bins) %>%
+    summarise(good_rate = mean(loan_paid_back == 1)) %>%
+    ggplot(aes(x = LTI_Bins, y = good_rate, group = loan_purpose, linetype = loan_purpose)) +
+    geom_line(color = "black") +
+    geom_point(color = "black") +
+    scale_y_continuous(
+    labels = label_percent(accuracy = 1),  # Converts 0.85 → 85%
+    limits = c(0, 1),                      # Optional: fixes y-axis from 0–100%
+    expand = expansion(mult = c(0, 0.05))) +
+    labs(
+            title = "Interaction b/w Loan Purpose and LTI",
+            x = "DTI",
+            y = "Loan Repayment Rate (%)"
+        ) +
+        theme_bw() +
+        theme(legend.title = element_blank())
+```
+
+As seen from the above chart, there doesn't seem to be an interaction between LTI and Loan purpose as the loan repayment rate remains stable across all DTI bins and in similar range for all categories of loan purposes.
+
+### Heatmap of DTI by Credit Score
+
+We will use heatmap to understand the interaction between DTI and Credit Score.
+
+```{r cs_dti_int, include = TRUE}
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
+train_bins_char %>%
+    group_by(DTI_Bins, CreditScore_Bins) %>%
+    summarise(good_rate = mean(loan_paid_back == 1)) %>%
+    ggplot(aes(x = DTI_Bins, y = CreditScore_Bins, fill = good_rate)) +
+    geom_tile(color = "white") +
+    scale_fill_gradient(
+        low = "grey90",
+        high = "black",
+        name = "Loan Repayment Rate"
+    ) +
+    labs(
+            title = "Interaction b/w DTI and Credit Score",
+            x = "DTI",
+            y = "Credit Score"
+        ) +
+        theme_bw()
+```
+
+As seen from the above chart, it can be clearly seen that the loan repayment rate goes down as the credit score falls and DTI increases.Their interaction can also help us identify customers with higher or lower default risk.
+
+### Heatmap of Interest Rate by Credit Score
+
+Next, we will look at heatmap to understand the interaction between Interest Rate and Credit Score.
+
+```{r cs_ir_int, include = TRUE}
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
+train_bins_char %>%
+    group_by(InterestRate_Bins, CreditScore_Bins) %>%
+    summarise(good_rate = mean(loan_paid_back == 1)) %>%
+    ggplot(aes(x = InterestRate_Bins, y = CreditScore_Bins, fill = good_rate)) +
+    geom_tile(color = "white") +
+    scale_fill_gradient(
+        low = "grey90",
+        high = "black",
+        name = "Loan Repayment Rate"
+    ) +
+    labs(
+            title = "Interaction b/w Interest Rate and Credit Score",
+            x = "Interest Rate",
+            y = "Credit Score"
+        ) +
+        theme_bw()
+```
+
+As seen from the above chart, it can be clearly seen that the customers with high credit score are immune to interest rates but as we go below credit score of 727, their loan repayment rate starts to go down across different interest rate bins. Based on this, we don't see any interaction between Credit Score and Interest Rate.
+
+### Heatmap of Employment Status by Grade Sub-grade
+
+Finally, let's look at heatmap to understand the interaction between Employment Status by Grade Sub-grade.
+
+```{r es_gs_int, include = TRUE}
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
+train_bins_char %>%
+    group_by(employment_status, grade_subgrade) %>%
+    summarise(good_rate = mean(loan_paid_back == 1)) %>%
+    ggplot(aes(x = grade_subgrade, y = employment_status, fill = good_rate)) +
+    geom_tile(color = "white") +
+    scale_fill_gradient(
+        low = "grey90",
+        high = "black",
+        name = "Loan Repayment Rate"
+    ) +
+    labs(
+            title = "Interaction b/w Employment Status by Grade Sub-grade",
+            x = "Grade Sub-grade",
+            y = "Employment Status"
+        ) +
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+As seen from the above chart, it can be clearly seen that the dominating factor is employment status and loan repayment rate stays within a given employment status. In employment status, there seems to be minor interaction with Grade Sub-grade. But it can be ignored.
+
+We are done with our EDA! Now, let's move to feature engineering and variable selection in next step.
