@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Mayank Lal">
-<meta name="dcterms.date" content="2025-11-13">
+<meta name="dcterms.date" content="2025-11-14">
 
 <title>Credit Risk Scorecard Model - EDA</title>
 <style>
@@ -68,7 +68,7 @@ ul.task-list li input[type="checkbox"] {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">November 13, 2025</p>
+      <p class="date">November 14, 2025</p>
     </div>
   </div>
   
@@ -523,7 +523,7 @@ ul.task-list li input[type="checkbox"] {
 <div class="cell-output-display">
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/target_variable-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+<p><img src="01_EDA_files/figure-html/target_variable_train-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
@@ -734,6 +734,16 @@ ul.task-list li input[type="checkbox"] {
 </div>
 </div>
 <p>As we can see for the chart above, the distribution of the customers who paid back their loan is very close to customers who didn’t pay back their loan. As expected, it doesn’t seem to have a good predictive power.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/loan_amount_outlier-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>From the box plot, it can be seen that the loan amount of the customers who have paid back their loan is similar to the customers who didn’t pay back their loan.</p>
 </section>
 <section id="annual-income-x-loan-paid-back" class="level3">
 <h3 class="anchored" data-anchor-id="annual-income-x-loan-paid-back">Annual Income x Loan Paid Back</h3>
@@ -759,7 +769,7 @@ ul.task-list li input[type="checkbox"] {
 </div>
 </div>
 </div>
-<p>From the box plot, it can be seen that the interest_rate of the customers who have paid back their loan is lower than the customers who didn’t pay back their loan.</p>
+<p>From the box plot, it can be seen that the annual income of the customers who have paid back their loan is similar to the customers who didn’t pay back their loan.</p>
 </section>
 <section id="gender-x-loan-paid-back" class="level3">
 <h3 class="anchored" data-anchor-id="gender-x-loan-paid-back">Gender x Loan Paid Back</h3>
@@ -902,7 +912,7 @@ ul.task-list li input[type="checkbox"] {
 </section>
 <section id="bubble-plot-of-loan-to-income-ratio-lti" class="level3">
 <h3 class="anchored" data-anchor-id="bubble-plot-of-loan-to-income-ratio-lti">Bubble Plot of Loan to Income Ratio (LTI)</h3>
-<p>Here, instead of creating separate bubbe plots for loan amount and annual income, I have derived another variable using them called <strong>Loan to Income Ratio</strong>. As compared to DTI, LTI tells us the affordability of this specific loan. Its focus is on the capacity risk of the customer, i.e., the ability to sustain new loan. Let’s have a look at the relationship between LTI and Good Rate (Rate of Payment of Loan).</p>
+<p>Here, instead of creating separate bubble plots for loan amount and annual income, I have derived another variable using them called <strong>Loan to Income Ratio</strong>. As compared to DTI, LTI tells us the affordability of this specific loan. Its focus is on the capacity risk of the customer, i.e., the ability to sustain new loan. Let’s have a look at the relationship between LTI and Good Rate (Rate of Payment of Loan).</p>
 <div class="cell" data-layout-align="center">
 <div class="cell-output-display">
 <div class="quarto-figure quarto-figure-center">
@@ -914,20 +924,197 @@ ul.task-list li input[type="checkbox"] {
 </div>
 <p>As it can be seen from the above chart, the loan repayment rate has a non-monotonic relationship with LTI. The repayment probability first rises and then falls.</p>
 </section>
+<section id="bubble-plot-of-gender" class="level3">
+<h3 class="anchored" data-anchor-id="bubble-plot-of-gender">Bubble Plot of Gender</h3>
+<p>In this section, we will look at bubble plot of categorical variables. First, let’s look at bubble plot of Gender.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/gender_mono-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As we can see from the above chart, the loan repayment rate of all three categories of gender are very close to each other as we have seen previously in the bar chart as well. This further confirms it. A general order that gets revealed is: Female &gt; Male &gt; Other.</p>
+</section>
+<section id="bubble-plot-of-marital-status" class="level3">
+<h3 class="anchored" data-anchor-id="bubble-plot-of-marital-status">Bubble Plot of Marital Status</h3>
+<p>Next, we will look at bubble plot of Marital Status.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/marital_status_mono-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As we can see from the above chart, the loan repayment rate of all three categories of marital status are very close to each other as we have seen previously in the bar chart as well. This further confirms it. A general order that gets revealed is: Married &gt; Single &gt; Divorced &gt; Widowed.</p>
+</section>
+<section id="bubble-plot-of-education-level" class="level3">
+<h3 class="anchored" data-anchor-id="bubble-plot-of-education-level">Bubble Plot of Education Level</h3>
+<p>Now, we will look at bubble plot of Education Level.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/education_level_mono-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As we can see from the above chart, the loan repayment rate of all three categories of education level are very close to each other as we have seen previously in the bar chart as well. This further confirms it. A general order that gets revealed is: PhD &gt; High School &gt; Master’s &gt; Other &gt; Bachelor’s.</p>
+</section>
+<section id="bubble-plot-of-employment-status" class="level3">
+<h3 class="anchored" data-anchor-id="bubble-plot-of-employment-status">Bubble Plot of Employment Status</h3>
+<p>Here we will look at bubble plot of Employment Status.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/employment_status_mono-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As we can see from the above chart, the loan repayment rate of all three categories of employment status show a monotonic downward trend as we have seen previously in the bar chart as well. This further confirms it. A general order that gets revealed is: Retired &gt; Employed &gt; Self-employed &gt; Student &gt; Unemployed.</p>
+</section>
+<section id="bubble-plot-of-loan-purpose" class="level3">
+<h3 class="anchored" data-anchor-id="bubble-plot-of-loan-purpose">Bubble Plot of Loan Purpose</h3>
+<p>In below chart, we will look at bubble plot of Loan Purpose.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/loan_purpose_mono-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As we can see from the above chart, the loan repayment rate of all three categories of loan purpose are very close to each other as we have seen previously in the bar chart as well. This further confirms it.</p>
+</section>
+<section id="bubble-plot-of-grade-sub-grade" class="level3">
+<h3 class="anchored" data-anchor-id="bubble-plot-of-grade-sub-grade">Bubble Plot of Grade Sub-grade</h3>
+<p>Finally, let’s have look at bubble plot of grade sub-grade.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/grade_subgrade_mono-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As we can see from the above chart, the loan repayment rate of all three categories of grade sub-grade show a clear monotonic downward trend as we have seen previously in the bar chart as well. This further confirms it. A general order that gets revealed is: A &gt; B &gt; C &gt; D &gt; E &gt; F.</p>
+</section>
 </section>
 <section id="correlation-analysis" class="level2">
 <h2 class="anchored" data-anchor-id="correlation-analysis">Correlation Analysis</h2>
 <p>In this section, we will perform correlation analysis to identify variables that convery similar information, which can cause redundancy and instability in models. Since most numeric variables in this dataset are skewed and show monotonic rather than linear relationships, <strong>Spearman’s rank correlation</strong> is used instead of Pearson’s. It is more robust to outliers and better suited for non-nomral, monotoninc data common in credit risk modelling.</p>
-<div class="cell">
+<div class="cell" data-layout-align="center">
 <div class="cell-output-display">
-<div>
+<div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="01_EDA_files/figure-html/corr-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="01_EDA_files/figure-html/corr-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
 </figure>
 </div>
 </div>
 </div>
 <p>As seen from the above chart, it can be concluded that the numeric predictors show low to moderate correlations, with credit score and DTI displaying expected opposing trends. The weak pairwise correlations indicate low redundancy, making all variables suitable for further modeling and feature selection.</p>
+</section>
+<section id="interaction-analysis" class="level2">
+<h2 class="anchored" data-anchor-id="interaction-analysis">Interaction Analysis</h2>
+<p>In this section, we will try to identify variable pairs which can have interaction between them. We will use business intuition and a simple decision tree to identify these pair of variables.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/tree-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Based on the decision tree as shown above and business intuition, we have shortlisted following pairs:</p>
+<ul>
+<li>Employment Status x DTI</li>
+<li>DTI x Credit Score</li>
+<li>Interest Rate x Credit Score</li>
+<li>Loan Purpose x LTI</li>
+<li>Employment Status x Grade Sub-grade</li>
+</ul>
+<section id="line-plot-of-employment-status-by-dti" class="level3">
+<h3 class="anchored" data-anchor-id="line-plot-of-employment-status-by-dti">Line Plot of Employment Status by DTI</h3>
+<p>Let’s start by looking at line plot to understand the interaction between Employment Status and DTI.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/es_dti_int-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As seen from the above chart, it can be clearly seen that customers with the employment status - Employed, Retired and Self-employed have higher repayment rate across DTI Bins than the customers with the employment status - Student and Unemployed.</p>
+<p>So, their interaction can help us identify customers with higher or lower default risk.</p>
+</section>
+<section id="line-plot-of-loan-purpose-by-lti" class="level3">
+<h3 class="anchored" data-anchor-id="line-plot-of-loan-purpose-by-lti">Line Plot of Loan Purpose by LTI</h3>
+<p>Next, we will look at line plot to understand the interaction between Loan Purpose and LTI.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/ls_lti_int-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As seen from the above chart, there doesn’t seem to be an interaction between LTI and Loan purpose as the loan repayment rate remains stable across all DTI bins and in similar range for all categories of loan purposes.</p>
+</section>
+<section id="heatmap-of-dti-by-credit-score" class="level3">
+<h3 class="anchored" data-anchor-id="heatmap-of-dti-by-credit-score">Heatmap of DTI by Credit Score</h3>
+<p>We will use heatmap to understand the interaction between DTI and Credit Score.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/cs_dti_int-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As seen from the above chart, it can be clearly seen that the loan repayment rate goes down as the credit score falls and DTI increases.Their interaction can also help us identify customers with higher or lower default risk.</p>
+</section>
+<section id="heatmap-of-interest-rate-by-credit-score" class="level3">
+<h3 class="anchored" data-anchor-id="heatmap-of-interest-rate-by-credit-score">Heatmap of Interest Rate by Credit Score</h3>
+<p>Next, we will look at heatmap to understand the interaction between Interest Rate and Credit Score.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/cs_ir_int-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As seen from the above chart, it can be clearly seen that the customers with high credit score are immune to interest rates but as we go below credit score of 727, their loan repayment rate starts to go down across different interest rate bins. Based on this, we don’t see any interaction between Credit Score and Interest Rate.</p>
+</section>
+<section id="heatmap-of-employment-status-by-grade-sub-grade" class="level3">
+<h3 class="anchored" data-anchor-id="heatmap-of-employment-status-by-grade-sub-grade">Heatmap of Employment Status by Grade Sub-grade</h3>
+<p>Finally, let’s look at heatmap to understand the interaction between Employment Status by Grade Sub-grade.</p>
+<div class="cell" data-layout-align="center">
+<div class="cell-output-display">
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="01_EDA_files/figure-html/es_gs_int-1.png" class="img-fluid quarto-figure quarto-figure-center figure-img" width="1152"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As seen from the above chart, it can be clearly seen that the dominating factor is employment status and loan repayment rate stays within a given employment status. In employment status, there seems to be minor interaction with Grade Sub-grade. But it can be ignored.</p>
+<p>We are done with our EDA! Now, let’s move to feature engineering and variable selection in next step.</p>
+</section>
 </section>
 
 </main>
