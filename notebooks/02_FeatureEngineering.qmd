@@ -1,0 +1,72 @@
+---
+title: "Credit Risk Scorecard Model - Feature Engineering"
+author: "Mayank Lal"
+date: today
+format: 
+    html:
+        code-fold: true
+        code-summary: "Code"
+        code-overflow: wrap
+execute:
+  echo: false
+  include: false
+  warning: false
+---
+```{r setup}
+## Exploratory Data Analysis
+library(tidyverse) # Data Manipulation and Visualizaton
+library(data.table) # Large datasets
+library(vtable) # Formatted Summary Table
+library(corrplot) # Correlation
+library(patchwork) # Grid of plots
+library(scales) # For Percentage Labels
+library(rpart) # Simple Decision Tree for interaction analysis
+library(rpart.plot) # Plotting Decision Trees
+
+## Variable Selection and Feature Engineering
+library(scorecard) # Information Value
+library(pROC) # Gini
+library(gt) # Formattting Table for publishing
+library(knitr) # For simple formatting
+library(DT) # For interactive tables
+```
+
+```{r data}
+# Load Data
+train <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/train.csv")
+
+# Let's select relevant set of variables
+train_main <- train %>%
+                  mutate(loan_to_income_ratio = loan_amount/annual_income) %>%
+                  select(-annual_income, -loan_amount, -id)
+```
+
+## Variable Selection
+
+We begin this journey by selecting variables for model development using regression and tree-based techniques. 
+
+First, we will look at Information Value and Gini.
+
+## Information Value
+
+In this section, we will calculate Information Value to filter variables fro regression / scorecard modeling.
+
+```{r information_value, include = TRUE}
+iv_table <- iv(train_main, y = "loan_paid_back")
+kable(iv_table, caption = "Information Value of Variables")
+```
+
+Based on IV statistic, we will only select variable with IV > 0.02. This gives us following variables:
+
+- Employment Status
+- DTI
+- Credit Score
+- Grade Sub-grade
+- Interest Rate
+
+## Clustering-based Filtering
+
+In this section, we will 
+
+```{r cluster, include = TRUE}
+```
