@@ -1056,6 +1056,9 @@ train_bins_char %>%
         ) +
         theme_bw() +
         theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Save dataset
+save(train_bins_char, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/processedTrain.Rdata")
 ```
 
 As seen from the above chart, it can be clearly seen that the dominating factor is employment status and loan repayment rate stays within a given employment status. In employment status, there seems to be minor interaction with Grade Sub-grade. But it can be ignored.
