@@ -29,6 +29,8 @@ library(pROC) # Gini
 library(gt) # Formattting Table for publishing
 library(knitr) # For simple formatting
 library(DT) # For interactive tables
+library(stringr) # Selecting sub-strings
+library(Hmisc) # Variabel Clustering
 ```
 
 ```{r data}
@@ -38,7 +40,7 @@ train <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/train.csv"
 # Let's select relevant set of variables
 train_main <- train %>%
                   mutate(loan_to_income_ratio = loan_amount/annual_income) %>%
-                  select(-annual_income, -loan_amount, -id)
+                  select(-annual_income, -loan_amount)
 ```
 
 ## Variable Selection
@@ -52,7 +54,8 @@ First, we will look at Information Value and Gini.
 In this section, we will calculate Information Value to filter variables fro regression / scorecard modeling.
 
 ```{r information_value, include = TRUE}
-iv_table <- iv(train_main, y = "loan_paid_back")
+train_main_iv <- train_main %>% select(-id)
+iv_table <- iv(train_main_iv, y = "loan_paid_back")
 kable(iv_table, caption = "Information Value of Variables")
 ```
 
@@ -69,4 +72,58 @@ Based on IV statistic, we will only select variable with IV > 0.02. This gives u
 In this section, we will 
 
 ```{r cluster, include = TRUE}
+# Filter variables based on IV
+iv_selected_vars <- iv_table %>% filter(info_value > 0.02) %>% pull(variable)
+selected_vars <- c(iv_selected_vars, "id", "loan_paid_back")
+train_main_var_clus <- train_main[, ..selected_vars]
+
+# Convert categorical variables to numeric
+# Employment Status
+train_main_var_clus$employed_flag <- ifelse(
+  train_main_var_clus$employment_status %in% c("Employed","Self-emplpoyed", "Retired"),1,0
+)
+
+train_main_var_clus$employed_flag <- as.numeric(train_main_var_clus$employed_flag)
+
+# Grade Sub-grade
+train_main_var_clus$grade <- str_sub(train_main_var_clus$grade_subgrade, 1, 1)
+train_main_var_clus$grade <- factor(
+  train_main_var_clus$grade,
+  levels = c("A", "B", "C", "D", "E", "F"),
+  ordered = TRUE
+)
+train_main_var_clus$grade <- as.numeric(train_main_var_clus$grade)
+
+# Create correlation matrix
+train_corr <- train_main_var_clus %>% select(-id, 
+                                             -employment_status, 
+                                             -grade_subgrade,
+                                             -loan_paid_back)
+corr_matrix <- abs(cor(train_corr, use = "pairwise.complete.obs"))
+
+# Distance Matrix
+dist_matrix <- as.dist(1 - corr_matrix)
+
+# Perform hierarchial clustering
+hc <- hclust(dist_matrix, method = "complete")
+
+# Plot Dendogram 
+plot(hc, main = "Variable Clustering Dendogram")
+
+# Cut tree at correlation threshold of 0.75
+clusters <- cutree(hc, h = 0.75)
+
+# Recompute IV
+train_iv_transformed <-train_main_var_clus %>% select(-id,
+                                             -employment_status, 
+                                             -grade_subgrade
+                                             )
+iv_table_transformed <- iv(train_iv_transformed, y = "loan_paid_back")
+
+# Build cluster table with IV 
+cluster_df <- data.frame(variable = c("debt_to_income_ratio", "credit_score", "interest_rate", "employed_flag", "grade"),
+                         cluster = clusters[c("debt_to_income_ratio", "credit_score", "interest_rate", "employed_flag", "grade")]) %>%
+                         left_join(iv_table_transformed, by = "variable") %>%
+                         arrange(cluster, desc(info_value))
+kable(cluster_df)
 ```
