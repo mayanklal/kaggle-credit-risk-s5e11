@@ -38,6 +38,31 @@ library(glmnet) # LASSO
 ```{r data}
 # Load Data
 train <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/train.csv")
+test <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/test.csv")
+```
+
+
+```{r common_funcs}
+plot_bubble_chart <- function(data, var, target_var, title, x_label) {
+bubble <- data %>%
+  group_by({{var}}) %>%
+  summarise(
+    good_rate = mean({{target_var}} == 1),
+    count = n()
+  ) %>%
+  ggplot(aes(x = {{var}}, y = good_rate, size = count)) +
+  geom_point(alpha = 0.5) +
+  scale_size(range = c(10, 20), name = "No. of Customers") +
+  labs(
+        title = title,
+        x = x_label,
+        y = "Loan Repayment Rate"
+    ) +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
+return(bubble)
+}
 ```
 
 ## Variable Selection
@@ -376,6 +401,7 @@ First, we will perform of WOE Binning of numeric variables - **DTI**, **Annual I
 final_vars <- selected_vars_lasso[selected_vars_lasso != "(Intercept)"]
 final_vars[8] <- "loan_paid_back"
 train_final <- train_features_v2[,..final_vars]
+final_vars_test <- final_vars
 final_vars_test[8] <- "id"
 test_final <- test_features_v2[,..final_vars_test]
 
@@ -402,6 +428,6 @@ test_final_lr <- woebin_ply(test_final, num_bins)
 # Save Datasets
 save(train_final_lr, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_final_lr.Rdata")
 
-save(test_final_lr, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_final_lr.Rdata")
+save(test_final_lr, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_final_lr.Rdata")
 ```
 

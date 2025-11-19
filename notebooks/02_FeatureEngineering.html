@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Mayank Lal">
-<meta name="dcterms.date" content="2025-11-18">
+<meta name="dcterms.date" content="2025-11-19">
 
 <title>Credit Risk Scorecard Model - Feature Engineering</title>
 <style>
@@ -66,7 +66,7 @@ ul.task-list li input[type="checkbox"] {
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">November 18, 2025</p>
+      <p class="date">November 19, 2025</p>
     </div>
   </div>
   
@@ -84,7 +84,7 @@ ul.task-list li input[type="checkbox"] {
 <p>First, we will look at Information Value.</p>
 <section id="information-value" class="level3">
 <h3 class="anchored" data-anchor-id="information-value">Information Value</h3>
-<p>In this section, we will calculate Information Value to filter variables fro regression / scorecard modeling.</p>
+<p>In this section, we will calculate Information Value to filter variables for regression / scorecard modeling. <to be="" elaborated="" further=""></to></p>
 <div class="cell">
 <div class="cell-output-display">
 <table class="caption-top table table-sm table-striped small">
@@ -103,6 +103,14 @@ ul.task-list li input[type="checkbox"] {
 <tr class="even">
 <td style="text-align: left;">debt_to_income_ratio</td>
 <td style="text-align: right;">1.0405779</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">loan_amount</td>
+<td style="text-align: right;">0.5834913</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">annual_income</td>
+<td style="text-align: right;">0.5819700</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left;">credit_score</td>
@@ -125,14 +133,10 @@ ul.task-list li input[type="checkbox"] {
 <td style="text-align: right;">0.0040612</td>
 </tr>
 <tr class="even">
-<td style="text-align: left;">loan_to_income_ratio</td>
-<td style="text-align: right;">0.0026160</td>
-</tr>
-<tr class="odd">
 <td style="text-align: left;">gender</td>
 <td style="text-align: right;">0.0003436</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td style="text-align: left;">marital_status</td>
 <td style="text-align: right;">0.0000426</td>
 </tr>
@@ -140,28 +144,123 @@ ul.task-list li input[type="checkbox"] {
 </table>
 </div>
 </div>
-<p>Based on IV statistic, we will only select variable with IV &gt; 0.02. This gives us following variables:</p>
+<p>If this wasn’t a kaggle competition with a synthetic dataset, we would have only selected variables with IV &gt; 0.02. This would have given us following variables:</p>
 <ul>
 <li>Employment Status</li>
 <li>DTI</li>
+<li>Loan Amount</li>
+<li>Annual Income</li>
 <li>Credit Score</li>
 <li>Grade Sub-grade</li>
 <li>Interest Rate</li>
 </ul>
+<p>But since it is a kaggle competition, we would not be enforcing such a hard criterion for filtering variables. We will combine IV with our business intuition to select following variables:</p>
+<ul>
+<li>Employment Status</li>
+<li>DTI</li>
+<li>Loan Amount</li>
+<li>Annual Income</li>
+<li>Credit Score</li>
+<li>Grade Sub-grade</li>
+<li>Interest Rate</li>
+<li><strong>Loan Purpose</strong></li>
+<li><strong>Education Level</strong></li>
+</ul>
+<p>Why have we added <strong>Loan Purpose</strong> and <strong>Education Level</strong>? We have added them back based on our EDA analysis in which we saw a clear and noticeable difference in loan repayment rate between different classes of these variables. Also, they make business intuitive sense as well.</p>
+<p><strong>Loan Purpose</strong> will help us understand if a loan taken for a given purpose has higher likelihood of repayment or not. <strong>Education Level</strong> can be an indicator of future employability and income of the customer reducing the likelihood of loan default. Also, there might be an interaction between annual income and education level. We will investigate this in later phase.</p>
+<p>Also, one thing to note here is that IV of Employment Status and DTI is very suspiciously high (&gt;0.5). An IV this high is rare in real-world credit datasets. It signals:</p>
+<ul>
+<li>Possibility of data leakage</li>
+<li>Variable may be directly encoding the target</li>
+<li>Or near-direct proxy for “good/bad”</li>
+</ul>
+<p>But since this is a synthetic dataset on Kaggle, it can be expected. For sanctity sake, we will also perform data leakage check later on.</p>
 </section>
 <section id="clustering-based-filtering" class="level3">
 <h3 class="anchored" data-anchor-id="clustering-based-filtering">Clustering-based Filtering</h3>
-<p>In this section, we will filter variables using Hierarchial Clustering. Let’s first perform Hierarchial Clustering.</p>
+<p>In this section, we will perform process to filter variables using <strong>Hierarchical Clustering</strong>.</p>
+<p>Before performing clustering, we will have to transform categorical variables to numerical variables. After IV-based filtering, there are four categorical variables: <strong>Employment Status</strong>, <strong>Grade Sub-grade</strong>, <strong>Education Level</strong> and <strong>Loan Purpose</strong></p>
+<p>First let’s transform <strong>Employment Status</strong>. As we have seen in our EDA, the loan repayment rate is very high for three classes - <strong>Retired, Employed and Self-employed</strong>. Similarly, it is ver low for remaining two classes - <strong>Student and Unemployed</strong>. Given the clear separation, we can merge them into two groups and then apply <strong>WOE encoding</strong> to ensure that we don’t lose any information.</p>
 <div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>✔ Binning on 593994 rows and 2 columns in 00:00:00</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$working_flag</code></pre>
+</div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="02_FeatureEngineering_files/figure-html/cluster-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="02_FeatureEngineering_files/figure-html/employment_status-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
-<p>As seen from the chart above, there is high correlation between Credit Score, Grade and Interest Rate. We will recalculate Information Value (IV) using the transformed variables to select one variable from each cluster.</p>
+<p>Now, we will transform <strong>Grade Sub-grade</strong> variable. As we have seen in our EDA analysis, they have monotonic relationship with loan repayment rate. Also, it is an ordinal variable with clear order: <strong>A&gt;B&gt;C&gt;D&gt;E&gt;F</strong>. Therefore, we will try to merge the sub-grades into one grade and then convert into an ordinal factor variable. Then finally into a numeric variable.</p>
+<p>After that during feature engineering phase, we will try to find which transformation or encoding will be suitable for it - <strong>WOE Encoding</strong> or <strong>Target Encoding</strong>.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_FeatureEngineering_files/figure-html/grade-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As we can see from above chart, the Sub-grades have been merged to their Grade and converted to numeric.</p>
+<p>Next we will transform both <strong>Education Level</strong> and <strong>Loan Purpose</strong>. Both of these variables have multiple classes and don’t have definite order. There is slight variation in loan repayment rate of each class of these variables. Like previously we have done with <strong>Employment Status</strong>, we would be applying <strong>WOE encoding</strong> to convert them to numeric while preserving the signal embedded in them.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>✔ Binning on 593994 rows and 3 columns in 00:00:02</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$education_level</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_FeatureEngineering_files/figure-html/education_loan_purpose-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+$loan_purpose</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_FeatureEngineering_files/figure-html/education_loan_purpose-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>From the above charts, we can see that we are able to maintain monotonic relationship through <strong>WOE Encoding</strong>. It automatically merges classes within a variable to attain that. This will be used while performing modeling using logistic regression as well. Now, we will perform <strong>Hierarchical Clustering</strong>.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>✔ Binning on 593994 rows and 4 columns in 00:00:02</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>✔ Woe transformating on 593994 rows and 3 columns in 00:00:03</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>✔ Woe transformating on 254569 rows and 3 columns in 00:00:01</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_FeatureEngineering_files/figure-html/hc-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>From the above dendogram plot, we can see that there are <strong>two key clutsters</strong> as shown below:</p>
+<ul>
+<li><strong>Credit Score</strong>, <strong>Grade</strong>, and <strong>Interest Rate</strong></li>
+<li><strong>Debt to Income Ratio</strong> and <strong>Working Flag</strong></li>
+</ul>
+<p>From each of these clusters, we can select one variable with highest IV value. But before doing that we can also check their correlation and our business intuition. Based on both of them, we will decide which variables need to be kept for further processing and feature engineering.</p>
+<p>We will recalculate Information Value (IV) to determine if we need to make a decision about filtering out any variables from each of the above clusters.</p>
 <div class="cell">
 <div class="cell-output-display">
 <table class="caption-top table table-sm table-striped small">
@@ -174,49 +273,278 @@ ul.task-list li input[type="checkbox"] {
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left;">debt_to_income_ratio</td>
+<td style="text-align: left;">annual_income</td>
 <td style="text-align: right;">1</td>
+<td style="text-align: right;">0.5819700</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">debt_to_income_ratio</td>
+<td style="text-align: right;">2</td>
 <td style="text-align: right;">1.0405779</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td style="text-align: left;">credit_score</td>
-<td style="text-align: right;">2</td>
+<td style="text-align: right;">3</td>
 <td style="text-align: right;">0.4602449</td>
 </tr>
-<tr class="odd">
+<tr class="even">
 <td style="text-align: left;">grade</td>
-<td style="text-align: right;">2</td>
+<td style="text-align: right;">3</td>
 <td style="text-align: right;">0.3471607</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td style="text-align: left;">interest_rate</td>
-<td style="text-align: right;">2</td>
+<td style="text-align: right;">3</td>
 <td style="text-align: right;">0.1615389</td>
 </tr>
+<tr class="even">
+<td style="text-align: left;">loan_amount</td>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">0.5834913</td>
+</tr>
 <tr class="odd">
-<td style="text-align: left;">employed_flag</td>
-<td style="text-align: right;">3</td>
-<td style="text-align: right;">1.1795221</td>
+<td style="text-align: left;">education_level_woe</td>
+<td style="text-align: right;">5</td>
+<td style="text-align: right;">0.0037469</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">loan_purpose_woe</td>
+<td style="text-align: right;">6</td>
+<td style="text-align: right;">0.0039990</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">working_flag_woe</td>
+<td style="text-align: right;">7</td>
+<td style="text-align: right;">2.3126953</td>
 </tr>
 </tbody>
 </table>
 </div>
 </div>
-<p>As seen from above table, we will select Credit Score from Cluster 2. Now, we have following three final variables for regression-based models:</p>
-<ul>
-<li>Debt to Income Ratio (DTI)</li>
-<li>Credit Score</li>
-<li>Employed Flag</li>
-</ul>
+<p>Based on above table, we will keep all the variables for now. Though we should keep in mind that we can eliminate two variables from Cluster 3 if required later on.</p>
 </section>
+</section>
+<section id="multicollinearity" class="level2">
+<h2 class="anchored" data-anchor-id="multicollinearity">Multicollinearity</h2>
+<p>In this section, we will perform filtering using <strong>Variance Inflation Factor (VIF)</strong> statistic. VIF measures how much the variance of a regression coefficient is inflated due to multicollinearity between predictors.</p>
+<p>If a variable is strongly correlated with other predictors, its coefficient becomes unstable and its standard error becomes larger. VIF quantifies this effect. <add mathematical="" formula="" as="" well=""></add></p>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">variable</th>
+<th style="text-align: right;">vif</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">credit_score</td>
+<td style="text-align: right;">9.545585</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">grade</td>
+<td style="text-align: right;">9.116141</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">interest_rate</td>
+<td style="text-align: right;">1.408228</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">working_flag_woe</td>
+<td style="text-align: right;">1.040375</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">debt_to_income_ratio</td>
+<td style="text-align: right;">1.033953</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">loan_purpose_woe</td>
+<td style="text-align: right;">1.000587</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">education_level_woe</td>
+<td style="text-align: right;">1.000533</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">loan_amount</td>
+<td style="text-align: right;">1.000224</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">annual_income</td>
+<td style="text-align: right;">1.000106</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>Based on above table, we can finally make the decision to drop <strong>Grade</strong> due to multicollinearity (VIF &gt; 5) with <strong>Credit Score</strong> and <strong>Interest Rate</strong>. Also, Grade can be considered as discretized version of credit score which adds no information to our model. Therefore, we will be dropping <strong>Grade</strong> from our model.</p>
+<p>Let’s recalculate VIF after dropping <strong>Grade</strong>.</p>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">variable</th>
+<th style="text-align: right;">vif</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">credit_score</td>
+<td style="text-align: right;">1.420289</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">interest_rate</td>
+<td style="text-align: right;">1.408224</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">working_flag_woe</td>
+<td style="text-align: right;">1.040292</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">debt_to_income_ratio</td>
+<td style="text-align: right;">1.033945</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">loan_purpose_woe</td>
+<td style="text-align: right;">1.000584</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">education_level_woe</td>
+<td style="text-align: right;">1.000533</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">loan_amount</td>
+<td style="text-align: right;">1.000222</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">annual_income</td>
+<td style="text-align: right;">1.000103</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>As we can see from above table, now VIF for all variables is under 2.</p>
+</section>
+<section id="data-leakage-check" class="level2">
+<h2 class="anchored" data-anchor-id="data-leakage-check">Data Leakage Check</h2>
+<p>In this section, we will perform three tests to confirm if there is any data leakage with regards to two variables - <strong>Working Flag</strong> and <strong>Debt to Income Ratio</strong>.</p>
+<p>In first test, we will compare IV using two versions of the variable. If IV collapses drastically under a noisy or lagged version, the original variable leaks.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>$original
+               variable info_value
+                 &lt;char&gt;      &lt;num&gt;
+1: debt_to_income_ratio   1.040578
+
+$noisy
+   variable    info_value
+     &lt;char&gt;         &lt;num&gt;
+1:    noisy 0.00006611242</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$original
+           variable info_value
+             &lt;char&gt;      &lt;num&gt;
+1: working_flag_woe   2.312695
+
+$noisy
+   variable    info_value
+     &lt;char&gt;         &lt;num&gt;
+1:    noisy 0.00009213036</code></pre>
+</div>
+</div>
+<p>From IV test, it looks like there is a data leakage issue for both variables.</p>
+<p>Let’s move to second test using correlation.</p>
+<p>In this test, only <strong>Working Flag</strong> failed it as its correlation was greater than 0.5.</p>
+<p>In the final test, we will plot WoE bins.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>✔ Binning on 593994 rows and 2 columns in 00:00:01</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$debt_to_income_ratio</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_FeatureEngineering_files/figure-html/woe_test-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>✔ Binning on 593994 rows and 2 columns in 00:00:00</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$working_flag_woe</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_FeatureEngineering_files/figure-html/woe_test-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>In this test also, <strong>Working Flag</strong> failed the test as it has a perfect monotonic curve shape.</p>
+<p>Given that this is a synthetic dataset on Kaggle, we will be keeping both these variables in our dataset as they have very strong predictive power.</p>
+</section>
+<section id="lasso" class="level2">
+<h2 class="anchored" data-anchor-id="lasso">LASSO</h2>
+<p>LASSO (Least Absolute Shrinkage and Selection Operator) is a regularized version of logistic or linear regression that performs:</p>
+<ul>
+<li>Variable Selection</li>
+<li>Coefficient Shrinkage</li>
+<li>Model Simplification</li>
+<li>Prevention of Overfitting</li>
+</ul>
+<p>It is widely used in credit-risk modeling to identify the strongest predictors before performing logistic regression.</p>
+<p>Let’s LASSO.</p>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<thead>
+<tr class="header">
+<th style="text-align: left;">variable</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">annual_income</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">debt_to_income_ratio</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">credit_score</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">interest_rate</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">education_level_woe</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">loan_purpose_woe</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">working_flag_woe</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>After performing variable selection using LASSO, only variable to be dropped is <strong>Loan Amount</strong>. It makes business intuitive sense as well because it is a representation of lender’s decision and not borrower’s quality.</p>
 </section>
 <section id="feature-engineering" class="level2">
 <h2 class="anchored" data-anchor-id="feature-engineering">Feature Engineering</h2>
-<p>In this section, we will transform final set of variables to make them suitable for regression and tree-based models.</p>
-<p>First, we will perform of WOE Binning of numeric variables - <strong>DTI</strong> and <strong>Credit Score</strong>.</p>
+<p>In this section, we will transform final set of variables to make them suitable for Logistic Regression.</p>
+<p>First, we will perform of WOE Binning of numeric variables - <strong>DTI</strong>, <strong>Annual Income</strong>, <strong>Interest Rate</strong> and <strong>Credit Score</strong>.</p>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
-<pre><code>✔ Binning on 593994 rows and 3 columns in 00:00:02</code></pre>
+<pre><code>✔ Binning on 593994 rows and 5 columns in 00:00:03</code></pre>
 </div>
 <div class="cell-output cell-output-stdout">
 <pre><code>$debt_to_income_ratio</code></pre>
@@ -239,8 +567,30 @@ $credit_score</code></pre>
 </figure>
 </div>
 </div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+$annual_income</code></pre>
 </div>
-<p>As seen from above plot, we can see that the positive probability has monotonic relationship with DTI bins and Credit Score bins.<further commentary="" to="" be="" added="" later="" on=""></further></p>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_FeatureEngineering_files/figure-html/woe-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+$interest_rate</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_FeatureEngineering_files/figure-html/woe-4.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>As seen from above plot, we can see that the positive probability has monotonic relationship with all WoE bins of numeric variables. This will be our final transformed variables that we will use for building logistic regression model.</p>
 </section>
 
 </main>

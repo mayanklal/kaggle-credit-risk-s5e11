@@ -31,6 +31,12 @@ library(knitr) # For simple formatting
 library(DT) # For interactive tables
 library(stringr) # Selecting sub-strings
 library(Hmisc) # Variabel Clustering
+library(car) # VIF
+library(glmnet) # LASSO
+
+# Model Development
+library(MASS) # Stepwise Regression
+library(lmtest)
 ```
 
 This is a rough sketch notebook. We will furnish it before publishing.
@@ -40,41 +46,88 @@ This is a rough sketch notebook. We will furnish it before publishing.
 load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_final_lr.Rdata")
 
 # Load Test Data
-test <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/test.csv")
+load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_final_lr.Rdata")
 ```
 
 ## Model Development
 
-Let's start with model development. First, we will use logistic regression.
+Let's start with model development. First, we will use stepwise logistic regression to select final list of variables that improves AIC.
 
-### Logistic Regression - Model 6 (The True One)
+### Logistic Regression - Stepwise Regression (Iteration 0)
 
-This is our sixth logistic regression model. But truly the first after getting a proper understanding of data and process flow. 
+```{r lr_step}
+# Create list of variables
+vars <- c("working_flag_woe",
+          "debt_to_income_ratio_woe",
+          "credit_score_woe",
+          "interest_rate_woe",
+          "education_level_woe",
+          "loan_purpose_woe",
+          "annual_income_woe")
 
-Fingers crossed. Here is hoping to cross the barrier of 0.92 using a wholistic approach.
+# Full model formula
+full_formula <- as.formula(
+  paste("loan_paid_back ~", paste(vars, collapse = " + "))
+)
 
-```{r lr6}
-# Build Logistic Regression Model
-model_woe_lr6 <- glm(loan_paid_back ~ working_flag_woe +    debt_to_income_ratio_woe + credit_score_woe + interest_rate_woe + education_level_woe + loan_purpose_woe + annual_income_woe + credit_score_woe*interest_rate_woe + debt_to_income_ratio_woe*credit_score_woe, data = train_final_lr, family = binomial(link = logit))
+# Null model (only intercept)
+null_formula <- loan_paid_back ~ 1
 
-summary(model_woe_lr6)
+stepwise_model <- stepAIC(
+    glm(loan_paid_back ~ ., data = train_final_lr, family = binomial),
+    scope=list(lower=null_formula, upper=full_formula),
+    direction="both",
+    trace=TRUE
+)
+
+summary(stepwise_model)
 ```
 
-```{r lr6_eval_perf}
-train_final_lr$pred_woe <- predict(model_woe_lr6, type = "response")
-roc_woe_lr6 <- roc(train_final_lr$loan_paid_back, train_final_lr$pred_woe)
-auc_woe_lr6 <- auc(roc_woe_lr6)
-gini_woe_lr6 <- 2*auc_woe_lr6 - 1
+### Logistic Regression - Final Model (Iteration 1)
 
-auc_woe_lr6
-gini_woe_lr6
+```{r lr_final}
+# Create list of final variables after stepwise regression
+final_model_vars <- names(coef(stepwise_model))[-1]
+
+# Final model formula
+final_formula <- as.formula(
+  paste("loan_paid_back ~", paste(final_model_vars, collapse = " + "))
+)
+
+# Build Final Logistic Regression Model
+final_model <- glm(final_formula, data = train_final_lr, family = binomial)
+summary(final_model)
 ```
 
-```{r test_pred_lr6}
-# Apply WoE encoding to variables of test dataset
-test_final_lr$loan_paid_back <- predict(model_woe_lr6, newdata=test_final_lr, type = "response")
 
-test_submission_lr6 <- test_final_lr %>% select(id, loan_paid_back)
+#### Perform wald test for individual predictors
 
-write.csv(test_submission_lr6, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_lr6.csv", row.names = FALSE)
+```{r wald_indv}
+Anova(final_model)
+```
+
+### Logistic Regression - Final Model with interactions (Iteration 2)
+```{r lr_interaction}
+# Create interaction terms
+interaction_terms <- c("debt_to_income_ratio_woe:credit_score_woe", "credit_score_woe:interest_rate_woe")
+
+# Create final formula with interactions
+final_formula_interaction <- as.formula(
+  paste("loan_paid_back ~",
+        paste(final_model_vars, collapse = " + "),
+        "+",
+        paste(interaction_terms, collapse = " + "))
+)
+
+# Build final model with interactions
+final_model_interaction <- glm(final_formula_interaction,
+                               data=train_final_lr,
+                               family=binomial)
+summary(final_model_interaction)
+```
+
+#### Perform wald joint test
+
+```{r wald_joint}
+waldtest(final_model, final_model_interaction)
 ```
