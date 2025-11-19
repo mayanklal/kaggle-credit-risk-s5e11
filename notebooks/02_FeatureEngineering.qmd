@@ -32,6 +32,7 @@ library(DT) # For interactive tables
 library(stringr) # Selecting sub-strings
 library(Hmisc) # Variabel Clustering
 library(car) # VIF
+library(glmnet) # LASSO
 ```
 
 ```{r data}
@@ -100,6 +101,7 @@ First let's transform **Employment Status**. As we have seen in our EDA, the loa
 ```{r employment_status, include = TRUE}
 # Create Working Flag
 train$working_flag <- ifelse(train$employment_status %in% c("Retired", "Employed", "Self-employed"),1 ,0)
+test$working_flag <- ifelse(test$employment_status %in% c("Retired", "Employed", "Self-employed"),1 ,0)
 
 # Apply WOE Encoding
 es_bins <- woebin(
@@ -158,15 +160,23 @@ train_corr <- train %>% select(-employment_status,
                                -grade_subgrade,
                                -gender,
                                -marital_status)
-# Perform WOE Binning to Education Level, Loan Purpose and Working Flag
+
+test_corr <- test %>% select(-employment_status, 
+                               -grade_subgrade,
+                               -gender,
+                               -marital_status)
+
+# Perform WoE Binning to Education Level, Loan Purpose and Working Flag
 bins <- woebin(
   train_corr,
   y = "loan_paid_back",
   x = c("education_level", "loan_purpose", "working_flag")
 )
 
-# Apply WOE Encoding to Education Level, Loan Purpose and Working Flag
+# Apply WoE Encoding to Education Level, Loan Purpose and Working Flag
 train_corr <- woebin_ply(train_corr, bins)
+test_corr <- woebin_ply(test_corr, bins)
+
 
 # Create correlation matrix
 corr_matrix <- abs(cor(train_corr[, c(-1, -7)], use = "pairwise.complete.obs"))
@@ -209,16 +219,19 @@ Based on above table, we will keep all the variables for now. Though we should k
 
 ## Multicollinearity
 
-In this section, we will perform filtering using **Variance Inflation Factor (VIF)** statistic.
+In this section, we will perform filtering using **Variance Inflation Factor (VIF)** statistic. VIF measures how much the variance of a regression coefficient is inflated due to multicollinearity between predictors.
+
+If a variable is strongly correlated with other predictors, its coefficient becomes unstable and its standard error becomes larger.
+VIF quantifies this effect. <Add Mathematical Formula as well>
 
 ```{r vif, include = TRUE}
 # Define target, id, and feature variables
 target_var <- "loan_paid_back"
 id_var <- "id"
-features <- train_corr[, !(names(train_corr) %in% c(id_var))]
+features_train <- train_corr[, !(names(train_corr) %in% c(id_var))]
 
 # Keep only features
-train_features <- train_corr[,..features]
+train_features <- train_corr[,..features_train]
 
 # Estimate VIF using simple linear regression model
 lm_model <- lm(loan_paid_back ~ ., data = train_features)
@@ -233,31 +246,162 @@ vif_df <- data.frame(
 kable(vif_df)
 ```
 
-## Feature Engineering
+Based on above table, we can finally make the decision to drop **Grade** due to multicollinearity (VIF > 5) with **Credit Score** and **Interest Rate**. Also, Grade can be considered as discretized version of credit score which adds no information to our model. Therefore, we will be dropping **Grade** from our model.
 
-In this section, we will transform final set of variables to make them suitable for regression and tree-based models.
+Let's recalculate VIF after dropping **Grade**.
 
-First, we will perform of WOE Binning of numeric variables - **DTI** and **Credit Score**.
+```{r vif2, include = TRUE}
+# Drop Grade
+features_train_v2 <- train_features[, !(names(train_features) %in% c("grade"))]
+features_test_v2 <- test_corr[, !(names(test_corr) %in% c("grade"))]
 
-```{r woe, include = TRUE}
-train_main_clus <- train_main_var_clus %>% select(-id, 
-                                             -employment_status, 
-                                             -grade_subgrade,
-                                             -grade,
-                                             -interest_rate)
-bins <- woebin(
-  train_main_clus,
-  y = "loan_paid_back",
-  x = c("debt_to_income_ratio", "credit_score")
+# Keep only features
+train_features_v2 <- train_features[,..features_train_v2]
+test_features_v2 <- test_corr[,..features_test_v2]
+
+# Estimate VIF using simple linear regression model
+lm_model_v2 <- lm(loan_paid_back ~ ., data = train_features_v2)
+
+# Re-calculate VIF
+vif_values_v2 <- vif(lm_model_v2)
+vif_df_v2 <- data.frame(
+  variable = names(vif_values_v2),
+  vif = as.numeric(vif_values_v2),
+  row.names = NULL
+) %>% arrange(desc(vif))
+kable(vif_df_v2)
+```
+
+As we can see from above table, now VIF for all variables is under 2.
+
+## Data Leakage Check
+
+In this section, we will perform three tests to confirm if there is any data leakage with regards to two variables - **Working Flag** and **Debt to Income Ratio**. 
+
+In first test, we will compare IV using two versions of the variable. If IV collapses drastically under a noisy or lagged version, the original variable leaks.
+
+```{r iv_test, include = TRUE}
+# Create function to estimate IV
+iv_fun <- function(df, var, target){
+  iv(df, y = target, x = var)
+}
+
+# Create function to compare IV 
+iv_compare <- function(df, var, target){
+  original_iv <- iv_fun(df, var, target)
+
+  # Add noise to simulate "pre-origination uncertainity"
+  df$noisy <- jitter(df[[var]])
+  noisy_iv <- iv_fun(df, "noisy", target)
+
+  return(list(original=original_iv, noisy=noisy_iv))
+}
+
+iv_compare(train_features_v2, "debt_to_income_ratio", "loan_paid_back")
+iv_compare(train_features_v2, "working_flag_woe", "loan_paid_back")
+```
+
+From IV test, it looks like there is a data leakage issue for both variables.
+
+Let's move to second test using correlation.
+
+```{r cor_test}
+cor(train_features_v2$debt_to_income_ratio, train_features_v2$loan_paid_back)
+cor(train_features_v2$loan_paid_back, train_features_v2$working_flag_woe)
+```
+
+In this test, only **Working Flag** failed it as its correlation was greater than 0.5.
+
+In the final test, we will plot WoE bins.
+
+```{r woe_test, include = TRUE}
+plot_woe <- function(df, var, target){
+  bins <- woebin(df, y = target, x = var)
+  woebin_plot(bins)
+}
+plot_woe(train_features_v2, "debt_to_income_ratio", "loan_paid_back")
+plot_woe(train_features_v2, "working_flag_woe", "loan_paid_back")
+```
+
+In this test also, **Working Flag** failed the test as it has a perfect monotonic curve shape. 
+
+Given that this is a synthetic dataset on Kaggle, we will be keeping both these variables in our dataset as they have very strong predictive power.
+
+## LASSO
+
+LASSO (Least Absolute Shrinkage and Selection Operator) is a regularized version of logistic or linear regression that performs:
+
+- Variable Selection
+- Coefficient Shrinkage
+- Model Simplification
+- Prevention of Overfitting
+
+It is widely used in credit-risk modeling to identify the strongest predictors before performing logistic regression.
+
+Let's LASSO.
+
+```{r lasso, include = TRUE}
+# Create dataset
+x <- model.matrix(loan_paid_back ~ ., train_features_v2)[, -1]
+y <- train_features_v2$loan_paid_back
+
+# Perform cross-validated LASSO
+set.seed(123)
+
+lasso_cv <- cv.glmnet(
+  x, y,
+  family = "binomial",
+  alpha = 1,
+  nfolds = 10
 )
 
-woebin_plot(bins)
+# Extract selected variables 
+coef_lasso <- coef(lasso_cv, s = "lambda.min")
+selected_vars_lasso <- rownames(coef_lasso)[coef_lasso[, 1] != 0]
+kable(data.frame(
+  variable = selected_vars_lasso[selected_vars_lasso != "(Intercept)"])
+  )
 ```
 
-As seen from above plot, we can see that the positive probability has monotonic relationship with DTI bins and Credit Score bins.<Further commentary to be added later on>
+After performing variable selection using LASSO, only variable to be dropped is **Loan Amount**. It makes business intuitive sense as well because it is a representation of lender's decision and not borrower's quality.
+
+## Feature Engineering
+
+In this section, we will transform final set of variables to make them suitable for Logistic Regression.
+
+First, we will perform of WOE Binning of numeric variables - **DTI**, **Annual Income**, **Interest Rate** and **Credit Score**.
+
+```{r woe, include = TRUE}
+# Create dataset
+final_vars <- selected_vars_lasso[selected_vars_lasso != "(Intercept)"]
+final_vars[8] <- "loan_paid_back"
+train_final <- train_features_v2[,..final_vars]
+final_vars_test[8] <- "id"
+test_final <- test_features_v2[,..final_vars_test]
+
+# Create Bins
+num_bins <- woebin(
+  train_final,
+  y = "loan_paid_back",
+  x = c("debt_to_income_ratio", "credit_score", "annual_income","interest_rate")
+)
+
+# Plot WoE Bins
+woebin_plot(num_bins)
+```
+
+As seen from above plot, we can see that the positive probability has monotonic relationship with all WoE bins of numeric variables. This will be our final transformed variables that we will use for building logistic regression model.
 
 ```{r woe_bins}
-# Apply WOE Bins Encoding to main dataset
-train_woe <- woebin_ply(train_main_clus, bins)
-save(train_woe, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_woe.Rdata")
+# Apply WoE Encoding to train dataset
+train_final_lr <- woebin_ply(train_final, num_bins)
+
+# Apply WoE Encoding to test dataset
+test_final_lr <- woebin_ply(test_final, num_bins)
+
+# Save Datasets
+save(train_final_lr, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_final_lr.Rdata")
+
+save(test_final_lr, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_final_lr.Rdata")
 ```
+

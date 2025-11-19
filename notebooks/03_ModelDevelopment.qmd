@@ -31,19 +31,13 @@ library(knitr) # For simple formatting
 library(DT) # For interactive tables
 library(stringr) # Selecting sub-strings
 library(Hmisc) # Variabel Clustering
-
-## Model Development
-library(glmnet) # Logistic Regression with Regularization
 ```
 
 This is a rough sketch notebook. We will furnish it before publishing.
 
 ```{r data}
-# Load Train Data
-train <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/train.csv")
-
 # Load Model Data
-load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_woe.Rdata")
+load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_final_lr.Rdata")
 
 # Load Test Data
 test <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/test.csv")
@@ -53,270 +47,34 @@ test <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/test.csv")
 
 Let's start with model development. First, we will use logistic regression.
 
-### Logistic Regression - Model 1 (Parsimonious)
+### Logistic Regression - Model 6 (The True One)
 
-```{r logistic_regression}
-model_woe <- glm(
-    loan_paid_back ~ .,
-    data = train_woe,
-    family = binomial(link = "logit")
-)
+This is our sixth logistic regression model. But truly the first after getting a proper understanding of data and process flow. 
 
-summary(model_woe)
-```
+Fingers crossed. Here is hoping to cross the barrier of 0.92 using a wholistic approach.
 
-```{r eval_perf}
-train_woe$pred_woe <- predict(model_woe, type = "response")
-roc_woe <- roc(train_woe$loan_paid_back, train_woe$pred_woe)
-auc_woe <- auc(roc_woe)
-gini_woe <- 2*auc_woe - 1
-
-auc_woe
-gini_woe
-```
-
-Brrrrrr! Let's run this model on test dataset and do our first submission on kaggle.
-
-First time, I'll be doing the entire competition on my own (with slight help from ChatGPT) and not just copy pasting and replicating someone else's work.
-
-```{r test_pred}
-test_main <- test %>% select(id, debt_to_income_ratio, credit_score, employment_status)
-
-test_main$employed_flag <- ifelse(test_main$employment_status %in% c("Retired", "Employed", "Self-employed"),1,0)
-
-test_main_woe <- woebin_ply(test_main, bins)
-
-test_main_woe$loan_paid_back <- predict(model_woe, newdata=test_main_woe, type = "response")
-
-test_submission <- test_main_woe %>% select(id, loan_paid_back)
-
-write.csv(test_submission, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission.csv", row.names = FALSE)
-```
-
-### Logistic Regression - Model 2 (Let's add back interest)
-
-We will try to capture more signal by adding back interest rate
-and its interaction with credit score.
-
-```{r lr2}
-# Select key variables
-train_lr2 <- train %>% select(id, debt_to_income_ratio, credit_score, interest_rate, employment_status, loan_paid_back)
-
-# Create employed flag
-train_lr2$employed_flag <- ifelse(train_lr2$employment_status %in% c("Retired", "Employed", "Self-employed"),1,0)
-
-# Perform WOE Binning
-bins_lr2 <- woebin(
-  train_lr2,
-  y = "loan_paid_back",
-  x = c("debt_to_income_ratio", "credit_score", "interest_rate")
-)
-
-# Apply WOE binning
-train_lr2_woe <- woebin_ply(train_lr2, bins_lr2)
-
+```{r lr6}
 # Build Logistic Regression Model
-model_woe_ir <- glm(loan_paid_back ~ employed_flag +    debt_to_income_ratio_woe + credit_score_woe + interest_rate_woe + credit_score_woe*interest_rate_woe, data = train_lr2_woe, family = binomial(link = logit))
+model_woe_lr6 <- glm(loan_paid_back ~ working_flag_woe +    debt_to_income_ratio_woe + credit_score_woe + interest_rate_woe + education_level_woe + loan_purpose_woe + annual_income_woe + credit_score_woe*interest_rate_woe + debt_to_income_ratio_woe*credit_score_woe, data = train_final_lr, family = binomial(link = logit))
 
-summary(model_woe_ir)
+summary(model_woe_lr6)
 ```
 
-```{r lr2_eval_perf}
-train_lr2_woe$pred_woe <- predict(model_woe_ir, type = "response")
-roc_woe_lr2 <- roc(train_lr2_woe$loan_paid_back, train_lr2_woe$pred_woe)
-auc_woe_lr2 <- auc(roc_woe_lr2)
-gini_woe_lr2 <- 2*auc_woe_lr2 - 1
+```{r lr6_eval_perf}
+train_final_lr$pred_woe <- predict(model_woe_lr6, type = "response")
+roc_woe_lr6 <- roc(train_final_lr$loan_paid_back, train_final_lr$pred_woe)
+auc_woe_lr6 <- auc(roc_woe_lr6)
+gini_woe_lr6 <- 2*auc_woe_lr6 - 1
 
-auc_woe_lr2
-gini_woe_lr2
+auc_woe_lr6
+gini_woe_lr6
 ```
 
-Amazing! We have seen a lift of 3% in AUC score. Fingers crossed for test dataset as well.
+```{r test_pred_lr6}
+# Apply WoE encoding to variables of test dataset
+test_final_lr$loan_paid_back <- predict(model_woe_lr6, newdata=test_final_lr, type = "response")
 
-```{r test_pred_lr2}
-test_main_lr2 <- test %>% select(id, debt_to_income_ratio, credit_score, 
-interest_rate,
-employment_status)
+test_submission_lr6 <- test_final_lr %>% select(id, loan_paid_back)
 
-test_main_lr2$employed_flag <- ifelse(test_main_lr2$employment_status %in% c("Retired", "Employed", "Self-employed"),1,0)
-
-test_main_lr2_woe <- woebin_ply(test_main_lr2, bins_lr2)
-
-test_main_lr2_woe$loan_paid_back <- predict(model_woe_ir, newdata=test_main_lr2_woe, type = "response")
-
-test_submission_lr2 <- test_main_lr2_woe %>% select(id, loan_paid_back)
-
-write.csv(test_submission_lr2, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_lr2.csv", row.names = FALSE)
-```
-
-### Logistic Regression - Model 3 (Fixing Silly mistakes)
-
-Silly me! Forgot few key things like interaction between DTI and Credit Score. WOE Binning of Employed_Flag.
-
-Let's try one more time.
-
-
-```{r lr3}
-# Select key variables
-train_lr3 <- train %>% select(id, debt_to_income_ratio, credit_score, interest_rate, employment_status, loan_paid_back)
-
-# Create employed flag
-train_lr3$employed_flag <- ifelse(train_lr3$employment_status %in% c("Retired", "Employed", "Self-employed"),1,0)
-
-# Perform WOE Binning
-bins_lr3 <- woebin(
-  train_lr3,
-  y = "loan_paid_back",
-  x = c("debt_to_income_ratio", "credit_score", "interest_rate", "employed_flag")
-)
-
-# Apply WOE binning
-train_lr3_woe <- woebin_ply(train_lr3, bins_lr3)
-
-# Build Logistic Regression Model
-model_woe_lr3 <- glm(loan_paid_back ~ employed_flag_woe +    debt_to_income_ratio_woe + credit_score_woe + interest_rate_woe + credit_score_woe*interest_rate_woe + debt_to_income_ratio_woe*credit_score_woe, data = train_lr3_woe, family = binomial(link = logit))
-
-summary(model_woe_lr3)
-```
-
-```{r lr3_eval_perf}
-train_lr3_woe$pred_woe <- predict(model_woe_lr3, type = "response")
-roc_woe_lr3 <- roc(train_lr3_woe$loan_paid_back, train_lr3_woe$pred_woe)
-auc_woe_lr3 <- auc(roc_woe_lr3)
-gini_woe_lr3 <- 2*auc_woe_lr3 - 1
-
-auc_woe_lr3
-gini_woe_lr3
-```
-
-```{r test_pred_lr3}
-test_main_lr3 <- test %>% select(id, debt_to_income_ratio, credit_score, 
-interest_rate,
-employment_status)
-
-test_main_lr3$employed_flag <- ifelse(test_main_lr3$employment_status %in% c("Retired", "Employed", "Self-employed"),1,0)
-
-test_main_lr3_woe <- woebin_ply(test_main_lr3, bins_lr3)
-
-test_main_lr3_woe$loan_paid_back <- predict(model_woe_lr3, newdata=test_main_lr3_woe, type = "response")
-
-test_submission_lr3 <- test_main_lr3_woe %>% select(id, loan_paid_back)
-
-write.csv(test_submission_lr3, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_lr3.csv", row.names = FALSE)
-```
-
-
-### Logistic Regression - Model 4 (Return of the Grade)
-
-Very minor jump in AUC. So, let's bring back the prodigal son - Grade.
-
-```{r lr4}
-# Select key variables
-train_lr4 <- train %>% select(id, debt_to_income_ratio, credit_score, interest_rate, employment_status, loan_paid_back, grade_subgrade)
-
-# Create employed flag
-train_lr4$employed_flag <- ifelse(train_lr4$employment_status %in% c("Retired", "Employed", "Self-employed"),1,0)
-
-# Create grade
-train_lr4$grade <- str_sub(train_lr4$grade_subgrade, 1, 1)
-train_lr4$grade <- factor(
-  train_lr4$grade,
-  levels = c("A", "B", "C", "D", "E", "F"),
-  ordered = TRUE
-)
-train_lr4$grade <- as.numeric(train_lr4$grade)
-
-# Perform WOE Binning
-bins_lr4 <- woebin(
-  train_lr4,
-  y = "loan_paid_back",
-  x = c("debt_to_income_ratio", "credit_score", "interest_rate", "employed_flag", "grade")
-)
-
-# Apply WOE binning
-train_lr4_woe <- woebin_ply(train_lr4, bins_lr4)
-
-# Build Logistic Regression Model
-model_woe_lr4 <- glm(loan_paid_back ~ employed_flag_woe +    debt_to_income_ratio_woe + credit_score_woe + interest_rate_woe + credit_score_woe*interest_rate_woe + debt_to_income_ratio_woe*credit_score_woe + grade_woe, data = train_lr4_woe, family = binomial(link = logit))
-
-summary(model_woe_lr4)
-```
-
-```{r lr4_eval_perf}
-train_lr4_woe$pred_woe <- predict(model_woe_lr4, type = "response")
-roc_woe_lr4 <- roc(train_lr4_woe$loan_paid_back, train_lr4_woe$pred_woe)
-auc_woe_lr4 <- auc(roc_woe_lr4)
-gini_woe_lr4 <- 2*auc_woe_lr4 - 1
-
-auc_woe_lr4
-gini_woe_lr4
-```
-
-```{r test_pred_lr4}
-test_main_lr4 <- test %>% select(id, debt_to_income_ratio, credit_score, 
-interest_rate,
-employment_status, grade_subgrade)
-
-test_main_lr4$employed_flag <- ifelse(test_main_lr4$employment_status %in% c("Retired", "Employed", "Self-employed"),1,0)
-
-test_main_lr4$grade <- str_sub(test_main_lr4$grade_subgrade, 1, 1)
-test_main_lr4$grade <- factor(
-  test_main_lr4$grade,
-  levels = c("A", "B", "C", "D", "E", "F"),
-  ordered = TRUE
-)
-test_main_lr4$grade <- as.numeric(test_main_lr4$grade)
-
-test_main_lr4_woe <- woebin_ply(test_main_lr4, bins_lr4)
-
-test_main_lr4_woe$loan_paid_back <- predict(model_woe_lr4, newdata=test_main_lr4_woe, type = "response")
-
-test_submission_lr4 <- test_main_lr4_woe %>% select(id, loan_paid_back)
-
-write.csv(test_submission_lr4, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_lr4.csv", row.names = FALSE)
-```
-
-### Logistic Regression - Model 5 (Regularization)
-
-We have exhausted all possible candidate variables and interactions based on our EDA Analysis and business intuition.
-
-Now, we will try to fine tune our model to squeeze out the lift in AUC to
-enter the league of champions.
-
-```{r lr5}
-X <- model.matrix(
-    loan_paid_back ~ employed_flag_woe + debt_to_income_ratio_woe + credit_score_woe + interest_rate_woe + credit_score_woe*interest_rate_woe + debt_to_income_ratio_woe*credit_score_woe + grade_woe,
-    train_lr4_woe
-)[,-1]
-
-y <- train_lr4_woe$loan_paid_back
-
-cv_en <- cv.glmnet(
-    X,y,
-    family = "binomial",
-    alpha = 0.5,
-    nfolds = 5
-)
-
-best_lambda_en <- cv_en$lambda.min
-
-model_en <- glmnet(
-    X,y,
-    family = "binomial",
-    alpha = 0.5,
-    lambda = best_lambda_en
-)
-
-plot(cv_en)
-```
-
-```{r lr5_eval_perf}
-pred_woe_lr5 <- predict(model_en, newx = X ,type = "response")
-
-roc_woe_lr5 <- roc(train_lr4_woe$loan_paid_back, as.numeric(pred_woe_lr5[,1]))
-auc_woe_lr5 <- auc(roc_woe_lr5)
-gini_woe_lr5 <- 2*auc_woe_lr5 - 1
-
-auc_woe_lr5
-gini_woe_lr5
+write.csv(test_submission_lr6, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_lr6.csv", row.names = FALSE)
 ```
