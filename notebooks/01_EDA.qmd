@@ -720,7 +720,7 @@ First, we will look at the relationship between DTI and Good Rate (Rate of Payme
 #| fig.height: 8
 #| fig.align: "center"
 plot_bubble_chart <- function(data, var, target_var, title, x_label) {
-bubble_dti <- data %>%
+bubble <- data %>%
   group_by({{var}}) %>%
   summarise(
     good_rate = mean({{target_var}} == 1),
@@ -737,7 +737,7 @@ bubble_dti <- data %>%
   theme_bw() +
   theme(
     axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
-return(bubble_dti)
+return(bubble)
 }
 plot_bubble_chart(train_num_bins, DTI_Bins, loan_paid_back, "Bubble Plot of DTI by Loan Repayment Rate", "Gender")
 ```
@@ -966,14 +966,43 @@ train_bins_char %>%
     expand = expansion(mult = c(0, 0.05))) +
     labs(
             title = "Interaction b/w Loan Purpose and LTI",
-            x = "DTI",
+            x = "LTI",
             y = "Loan Repayment Rate (%)"
         ) +
         theme_bw() +
         theme(legend.title = element_blank())
 ```
 
-As seen from the above chart, there doesn't seem to be an interaction between LTI and Loan purpose as the loan repayment rate remains stable across all DTI bins and in similar range for all categories of loan purposes.
+As seen from the above chart, there doesn't seem to be an interaction between LTI and Loan purpose as the loan repayment rate remains stable across all LTI bins and in similar range for all categories of loan purposes.
+
+### Line Plot of Education Level by LTI
+
+Next, we will look at line plot to understand the interaction between Education Level and LTI.
+
+```{r el_lti_int, include = TRUE}
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
+train_bins_char %>%
+    group_by(education_level, LTI_Bins) %>%
+    summarise(good_rate = mean(loan_paid_back == 1)) %>%
+    ggplot(aes(x = LTI_Bins, y = good_rate, group = education_level, linetype = education_level)) +
+    geom_line(color = "black") +
+    geom_point(color = "black") +
+    scale_y_continuous(
+    labels = label_percent(accuracy = 1),  # Converts 0.85 → 85%
+    limits = c(0, 1),                      # Optional: fixes y-axis from 0–100%
+    expand = expansion(mult = c(0, 0.05))) +
+    labs(
+            title = "Interaction b/w Education Level and LTI",
+            x = "LTI",
+            y = "Loan Repayment Rate (%)"
+        ) +
+        theme_bw() +
+        theme(legend.title = element_blank())
+```
+
+As seen from the above chart, there doesn't seem to be an interaction between LTI and Education Level as the loan repayment rate remains stable across all LTI bins and in similar range for all categories of education levels.
 
 ### Heatmap of DTI by Credit Score
 
