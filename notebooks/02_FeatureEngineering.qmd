@@ -31,99 +31,233 @@ library(knitr) # For simple formatting
 library(DT) # For interactive tables
 library(stringr) # Selecting sub-strings
 library(Hmisc) # Variabel Clustering
+library(car) # VIF
 ```
 
 ```{r data}
 # Load Data
 train <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/train.csv")
-
-# Let's select relevant set of variables
-train_main <- train %>%
-                  mutate(loan_to_income_ratio = loan_amount/annual_income) %>%
-                  select(-annual_income, -loan_amount)
 ```
 
 ## Variable Selection
 
 We begin this journey by selecting variables for model development using regression and tree-based techniques. 
 
-First, we will look at Information Value and Gini.
+First, we will look at Information Value.
 
-## Information Value
+### Information Value
 
-In this section, we will calculate Information Value to filter variables fro regression / scorecard modeling.
+In this section, we will calculate Information Value to filter variables for regression / scorecard modeling. <To be elaborated further>
 
 ```{r information_value, include = TRUE}
-train_main_iv <- train_main %>% select(-id)
-iv_table <- iv(train_main_iv, y = "loan_paid_back")
+vars <- colnames(train)[-1]
+iv_table <- iv(train[, ..vars], y = "loan_paid_back")
 kable(iv_table, caption = "Information Value of Variables")
 ```
 
-Based on IV statistic, we will only select variable with IV > 0.02. This gives us following variables:
+If this wasn't a kaggle competition with a synthetic dataset, we would have only selected variables with IV > 0.02. This would have given us following variables:
 
 - Employment Status
 - DTI
+- Loan Amount
+- Annual Income
 - Credit Score
 - Grade Sub-grade
 - Interest Rate
 
-## Clustering-based Filtering
+But since it is a kaggle competition, we would not be enforcing such a hard criterion for filtering variables. We will combine IV with our business intuition to select following variables:
 
-In this section, we will 
+- Employment Status
+- DTI
+- Loan Amount
+- Annual Income
+- Credit Score
+- Grade Sub-grade
+- Interest Rate
+- **Loan Purpose**
+- **Education Level**
 
-```{r cluster, include = TRUE}
-# Filter variables based on IV
-iv_selected_vars <- iv_table %>% filter(info_value > 0.02) %>% pull(variable)
-selected_vars <- c(iv_selected_vars, "id", "loan_paid_back")
-train_main_var_clus <- train_main[, ..selected_vars]
+Why have we added **Loan Purpose** and **Education Level**? We have added them back based on our EDA analysis in which we saw a clear and noticeable difference in loan repayment rate between different classes of these variables. Also, they make business intuitive sense as well. 
 
-# Convert categorical variables to numeric
-# Employment Status
-train_main_var_clus$employed_flag <- ifelse(
-  train_main_var_clus$employment_status %in% c("Employed","Self-emplpoyed", "Retired"),1,0
+**Loan Purpose** will help us understand if a loan taken for a given purpose has higher likelihood of repayment or not.  **Education Level** can be an indicator of future employability and income of the customer reducing the likelihood of loan default. Also, there might be an interaction between annual income and education level. We will investigate this in later phase.
+
+Also, one thing to note here is that IV of Employment Status and DTI is very suspiciously high (>0.5). An IV this high is rare in real-world credit datasets. It signals:
+
+- Possibility of data leakage
+- Variable may be directly encoding the target
+- Or near-direct proxy for “good/bad”
+
+But since this is a synthetic dataset on Kaggle, it can be expected. For sanctity sake, we will also perform data leakage check later on.
+
+### Clustering-based Filtering
+
+In this section, we will perform process to filter variables using **Hierarchical Clustering**.
+
+Before performing clustering, we will have to transform categorical variables to numerical variables. After IV-based filtering, there are four categorical variables: **Employment Status**, **Grade Sub-grade**, **Education Level** and **Loan Purpose**
+
+First let's transform **Employment Status**. As we have seen in our EDA, the loan repayment rate is very high for three classes - **Retired, Employed and Self-employed**. Similarly, it is ver low for remaining two classes - **Student and Unemployed**. Given the clear separation, we can merge them into two groups and then apply **WOE encoding** to ensure that we don't lose any information.
+
+```{r employment_status, include = TRUE}
+# Create Working Flag
+train$working_flag <- ifelse(train$employment_status %in% c("Retired", "Employed", "Self-employed"),1 ,0)
+
+# Apply WOE Encoding
+es_bins <- woebin(
+  train,
+  y = "loan_paid_back",
+  x = "working_flag"
 )
 
-train_main_var_clus$employed_flag <- as.numeric(train_main_var_clus$employed_flag)
+# Plot WOE Bins of Employment Status/Working Flag
+woebin_plot(es_bins)
+```
 
-# Grade Sub-grade
-train_main_var_clus$grade <- str_sub(train_main_var_clus$grade_subgrade, 1, 1)
-train_main_var_clus$grade <- factor(
-  train_main_var_clus$grade,
+Now, we will transform **Grade Sub-grade** variable. As we have seen in our EDA analysis, they have monotonic relationship with loan repayment rate. Also, it is an ordinal variable with clear order: **A>B>C>D>E>F**. Therefore, we will try to merge the sub-grades into one grade and then convert into an ordinal factor variable. Then finally into a numeric variable.
+
+After that during feature engineering phase, we will try to find which transformation or encoding will be suitable for it - **WOE Encoding** or **Target Encoding**.
+
+```{r grade, include = TRUE}
+# Merge Sub-grades to Grades using ordinal factor conversion
+train$grade <- str_sub(train$grade_subgrade, 1, 1)
+train$grade <- factor(
+  train$grade,
   levels = c("A", "B", "C", "D", "E", "F"),
   ordered = TRUE
 )
-train_main_var_clus$grade <- as.numeric(train_main_var_clus$grade)
+
+# Convert to numeric
+train$grade <- as.numeric(train$grade)
+
+# Plot Bubble plot of Grade
+#| fig.width: 12
+#| fig.height: 8
+#| fig.align: "center"
+plot_bubble_chart(train, grade, loan_paid_back, "Bubble Plot of Grade by Loan Repayment Rate", "Grade")
+```
+As we can see from above chart, the Sub-grades have been merged to their Grade and converted to numeric.
+
+Next we will transform both **Education Level** and **Loan Purpose**. Both of these variables have multiple classes and don't have definite order. There is slight variation in loan repayment rate of each class of these variables. Like previously we have done with **Employment Status**, we would be applying **WOE encoding** to convert them to numeric while preserving the signal embedded in them.
+
+```{r education_loan_purpose, include = TRUE}
+# Apply WOE Encoding
+ed_lp_bins <- woebin(
+  train,
+  y = "loan_paid_back",
+  x = c("education_level", "loan_purpose")
+)
+
+# Plot WOE Bins of Education Level and Loan Purpose
+woebin_plot(ed_lp_bins)
+```
+
+From the above charts, we can see that we are able to maintain monotonic relationship through **WOE Encoding**. It automatically merges classes within a variable to attain that. This will be used while performing modeling using logistic regression as well. Now, we will perform **Hierarchical Clustering**.
+
+```{r hc, include = TRUE}
+# Filter variables based on IV statistic and Business Intuition
+train_corr <- train %>% select(-employment_status, 
+                               -grade_subgrade,
+                               -gender,
+                               -marital_status)
+# Perform WOE Binning to Education Level, Loan Purpose and Working Flag
+bins <- woebin(
+  train_corr,
+  y = "loan_paid_back",
+  x = c("education_level", "loan_purpose", "working_flag")
+)
+
+# Apply WOE Encoding to Education Level, Loan Purpose and Working Flag
+train_corr <- woebin_ply(train_corr, bins)
 
 # Create correlation matrix
-train_corr <- train_main_var_clus %>% select(-id, 
-                                             -employment_status, 
-                                             -grade_subgrade,
-                                             -loan_paid_back)
-corr_matrix <- abs(cor(train_corr, use = "pairwise.complete.obs"))
+corr_matrix <- abs(cor(train_corr[, c(-1, -7)], use = "pairwise.complete.obs"))
 
-# Distance Matrix
+# Create distance matrix
 dist_matrix <- as.dist(1 - corr_matrix)
 
-# Perform hierarchial clustering
+# Perform hierarchical clustering
 hc <- hclust(dist_matrix, method = "complete")
 
 # Plot Dendogram 
 plot(hc, main = "Variable Clustering Dendogram")
+```
 
+From the above dendogram plot, we can see that there are **two key clutsters** as shown below:
+
+- **Credit Score**, **Grade**, and **Interest Rate**
+- **Debt to Income Ratio** and **Working Flag**
+
+From each of these clusters, we can select one variable with highest IV value. But before doing that we can also check their correlation and our business intuition. Based on both of them, we will decide which variables need to be kept for further processing and feature engineering.
+
+We will recalculate Information Value (IV) to determine if we need to make a decision about filtering out any variables from each of the above clusters.
+
+```{r hc_vars, include=TRUE}
 # Cut tree at correlation threshold of 0.75
 clusters <- cutree(hc, h = 0.75)
 
 # Recompute IV
-train_iv_transformed <-train_main_var_clus %>% select(-id,
-                                             -employment_status, 
-                                             -grade_subgrade
-                                             )
-iv_table_transformed <- iv(train_iv_transformed, y = "loan_paid_back")
+iv_table_transformed <- iv(train_corr[,-1], y = "loan_paid_back")
 
 # Build cluster table with IV 
-cluster_df <- data.frame(variable = c("debt_to_income_ratio", "credit_score", "interest_rate", "employed_flag", "grade"),
-                         cluster = clusters[c("debt_to_income_ratio", "credit_score", "interest_rate", "employed_flag", "grade")]) %>%
+cluster_df <- data.frame(variable = colnames(train_corr[,c(-1,-7)]),
+                         cluster = clusters) %>%
                          left_join(iv_table_transformed, by = "variable") %>%
                          arrange(cluster, desc(info_value))
 kable(cluster_df)
+```
+
+Based on above table, we will keep all the variables for now. Though we should keep in mind that we can eliminate two variables from Cluster 3 if required later on.
+
+## Multicollinearity
+
+In this section, we will perform filtering using **Variance Inflation Factor (VIF)** statistic.
+
+```{r vif, include = TRUE}
+# Define target, id, and feature variables
+target_var <- "loan_paid_back"
+id_var <- "id"
+features <- train_corr[, !(names(train_corr) %in% c(id_var))]
+
+# Keep only features
+train_features <- train_corr[,..features]
+
+# Estimate VIF using simple linear regression model
+lm_model <- lm(loan_paid_back ~ ., data = train_features)
+
+# Calculate VIF
+vif_values <- vif(lm_model)
+vif_df <- data.frame(
+  variable = names(vif_values),
+  vif = as.numeric(vif_values),
+  row.names = NULL
+) %>% arrange(desc(vif))
+kable(vif_df)
+```
+
+## Feature Engineering
+
+In this section, we will transform final set of variables to make them suitable for regression and tree-based models.
+
+First, we will perform of WOE Binning of numeric variables - **DTI** and **Credit Score**.
+
+```{r woe, include = TRUE}
+train_main_clus <- train_main_var_clus %>% select(-id, 
+                                             -employment_status, 
+                                             -grade_subgrade,
+                                             -grade,
+                                             -interest_rate)
+bins <- woebin(
+  train_main_clus,
+  y = "loan_paid_back",
+  x = c("debt_to_income_ratio", "credit_score")
+)
+
+woebin_plot(bins)
+```
+
+As seen from above plot, we can see that the positive probability has monotonic relationship with DTI bins and Credit Score bins.<Further commentary to be added later on>
+
+```{r woe_bins}
+# Apply WOE Bins Encoding to main dataset
+train_woe <- woebin_ply(train_main_clus, bins)
+save(train_woe, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_woe.Rdata")
 ```
