@@ -156,6 +156,18 @@ train$grade <- factor(
   ordered = FALSE
 )
 
+train$grade <- as.numeric(train$grade)
+
+
+test$grade <- str_sub(test$grade_subgrade, 1, 1)
+test$grade <- factor(
+  test$grade,
+  levels = c("A", "B", "C", "D", "E", "F"),
+  ordered = TRUE
+)
+
+test$grade <- as.numeric(test$grade)
+
 # Plot Bubble plot of Grade
 #| fig.width: 12
 #| fig.height: 8
@@ -435,6 +447,7 @@ save(test_final_lr, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/pr
 ### Tree-based Models (XGBoost, CatBoost, LightGBM)
 
 ```{r tree_features}
+# Prepare Train Dataset
 train_tree <- train %>%
                 mutate(loan_to_income_ratio = loan_amount/annual_income) %>%
                 select(-gender,
@@ -444,6 +457,22 @@ train_tree <- train %>%
                        -loan_amount)
 train_tree <-  train_tree %>%
                 mutate_if(sapply(train_tree, is.character), as.factor)
+
+# Prepare Test Dataset
+test_tree <- test %>%
+                mutate(loan_to_income_ratio = loan_amount/annual_income) %>%
+                select(-gender,
+                       -marital_status,
+                       -employment_status,
+                       -grade_subgrade,
+                       -loan_amount)
+test_tree <-  test_tree %>%
+                mutate_if(sapply(test_tree, is.character), as.factor)
+
+# Save Datasets
+save(train_tree, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_tree.Rdata")
+
+save(test_tree, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_tree.Rdata")
 ```
 
 
