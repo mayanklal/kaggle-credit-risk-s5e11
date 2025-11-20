@@ -36,10 +36,17 @@ library(glmnet) # LASSO
 
 # Model Development
 library(MASS) # Stepwise Regression
-library(lmtest)
+library(lmtest) # Joint Wald Test
+library(Matrix) # Create Matrix objects for XGBoost
+library(xgboost) # XGBoost
+library(caret) # Stratified Splitting
+library(SHAPforxgboost) # Interpretability
 ```
 
 This is a rough sketch notebook. We will furnish it before publishing.
+```{r setup}
+set.seed(123)
+```
 
 ```{r data}
 # Load Model Data
@@ -131,3 +138,4 @@ summary(final_model_interaction)
 ```{r wald_joint}
 waldtest(final_model, final_model_interaction)
 ```
+
