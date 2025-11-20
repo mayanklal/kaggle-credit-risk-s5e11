@@ -35,6 +35,9 @@ library(car) # VIF
 library(glmnet) # LASSO
 ```
 
+```{r setup}
+set.seed(123)
+```
 ```{r data}
 # Load Data
 train <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/train.csv")
@@ -149,11 +152,9 @@ train$grade <- str_sub(train$grade_subgrade, 1, 1)
 train$grade <- factor(
   train$grade,
   levels = c("A", "B", "C", "D", "E", "F"),
-  ordered = TRUE
+  labels = c(6,5,4,3,2,1),
+  ordered = FALSE
 )
-
-# Convert to numeric
-train$grade <- as.numeric(train$grade)
 
 # Plot Bubble plot of Grade
 #| fig.width: 12
@@ -242,7 +243,7 @@ kable(cluster_df)
 
 Based on above table, we will keep all the variables for now. Though we should keep in mind that we can eliminate two variables from Cluster 3 if required later on.
 
-## Multicollinearity
+### Multicollinearity
 
 In this section, we will perform filtering using **Variance Inflation Factor (VIF)** statistic. VIF measures how much the variance of a regression coefficient is inflated due to multicollinearity between predictors.
 
@@ -299,7 +300,7 @@ kable(vif_df_v2)
 
 As we can see from above table, now VIF for all variables is under 2.
 
-## Data Leakage Check
+### Data Leakage Check
 
 In this section, we will perform three tests to confirm if there is any data leakage with regards to two variables - **Working Flag** and **Debt to Income Ratio**. 
 
@@ -352,7 +353,7 @@ In this test also, **Working Flag** failed the test as it has a perfect monotoni
 
 Given that this is a synthetic dataset on Kaggle, we will be keeping both these variables in our dataset as they have very strong predictive power.
 
-## LASSO
+### LASSO
 
 LASSO (Least Absolute Shrinkage and Selection Operator) is a regularized version of logistic or linear regression that performs:
 
@@ -371,8 +372,6 @@ x <- model.matrix(loan_paid_back ~ ., train_features_v2)[, -1]
 y <- train_features_v2$loan_paid_back
 
 # Perform cross-validated LASSO
-set.seed(123)
-
 lasso_cv <- cv.glmnet(
   x, y,
   family = "binomial",
@@ -391,6 +390,8 @@ kable(data.frame(
 After performing variable selection using LASSO, only variable to be dropped is **Loan Amount**. It makes business intuitive sense as well because it is a representation of lender's decision and not borrower's quality.
 
 ## Feature Engineering
+
+### Logistic Regression
 
 In this section, we will transform final set of variables to make them suitable for Logistic Regression.
 
@@ -430,4 +431,19 @@ save(train_final_lr, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/p
 
 save(test_final_lr, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_final_lr.Rdata")
 ```
+
+### Tree-based Models (XGBoost, CatBoost, LightGBM)
+
+```{r tree_features}
+train_tree <- train %>%
+                mutate(loan_to_income_ratio = loan_amount/annual_income) %>%
+                select(-gender,
+                       -marital_status,
+                       -employment_status,
+                       -grade_subgrade,
+                       -loan_amount)
+train_tree <-  train_tree %>%
+                mutate_if(sapply(train_tree, is.character), as.factor)
+```
+
 
