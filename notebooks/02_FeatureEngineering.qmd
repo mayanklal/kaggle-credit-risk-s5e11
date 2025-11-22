@@ -33,6 +33,8 @@ library(stringr) # Selecting sub-strings
 library(Hmisc) # Variabel Clustering
 library(car) # VIF
 library(glmnet) # LASSO
+library(janitor) # Cleaning names
+library(caret) # Create Folds
 ```
 
 ```{r setup}
@@ -446,33 +448,397 @@ save(test_final_lr, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/pr
 
 ### Tree-based Models (XGBoost, CatBoost, LightGBM)
 
-```{r tree_features}
-# Prepare Train Dataset
-train_tree <- train %>%
-                mutate(loan_to_income_ratio = loan_amount/annual_income) %>%
-                select(-gender,
-                       -marital_status,
-                       -employment_status,
-                       -grade_subgrade,
-                       -loan_amount)
-train_tree <-  train_tree %>%
-                mutate_if(sapply(train_tree, is.character), as.factor)
+Based on our variable selection process performed for logistic regression, we have a follwing set of **candidate variables**:
 
-# Prepare Test Dataset
-test_tree <- test %>%
-                mutate(loan_to_income_ratio = loan_amount/annual_income) %>%
-                select(-gender,
-                       -marital_status,
-                       -employment_status,
-                       -grade_subgrade,
-                       -loan_amount)
-test_tree <-  test_tree %>%
-                mutate_if(sapply(test_tree, is.character), as.factor)
+- Debt to Income Ratio (DTI)
+- Credit Score
+- Interest Rate
+- Annual Income
+- Employment Status
+- Education Level
+- Grade Sub-grade
+- Loan Purpose
+
+We will try to engineer these variables to increase our feature space so that tree-based models can use the feature space to identify non-linear relationships that linear models like logistic regression aren't able to capture.
+
+First, we will be focusing on numeric variables. We will perform **quantile binning** to create binned variables. These **binned variables** will then be target encoded during k-fold cross validation. Also, we will be supplying numeric variables in three forms - raw, binned, and target encoded - in an incremental way. We are following this strategy so that XGBoost can identify which form of variables captures most useful signal and utilize that while building the model.
+
+```{r tree_num_vars}
+# Select Candidate Variables
+train_tree <- train %>% select(
+                        id,
+                        loan_paid_back,
+                        debt_to_income_ratio,
+                        credit_score,
+                        interest_rate,
+                        annual_income,
+                        employment_status,
+                        education_level,
+                        grade_subgrade,
+                        loan_purpose,
+                        grade,
+                        working_flag
+                        )
+
+test_tree <- test %>% select(
+                        id,
+                        debt_to_income_ratio,
+                        credit_score,
+                        interest_rate,
+                        annual_income,
+                        employment_status,
+                        education_level,
+                        grade_subgrade,
+                        loan_purpose,
+                        grade,
+                        working_flag
+                        )
+
+# Function to create bins
+create_bins <- function(train_vec, test_vec, n_bins = 5) {
+
+  # compute breaks on train
+  breaks <- quantile(train_vec,
+                     probs = seq(0, 1, length.out = n_bins + 1),
+                     na.rm = TRUE,
+                     include.lowest = TRUE)
+
+  # bin train & test
+  train_bin <- cut(train_vec, breaks = breaks, include.lowest = TRUE)
+  test_bin  <- cut(test_vec,  breaks = breaks, include.lowest = TRUE)
+
+  return(list(train_bin = train_bin,
+              test_bin  = test_bin,
+              breaks    = breaks))
+}
+
+# Bin Numeric Variables
+vars_to_bin <- c("debt_to_income_ratio", "credit_score", 
+                 "annual_income")
+
+train_tree_binned <- train_tree
+test_tree_binned <- test_tree
+
+for (v in vars_to_bin) {
+  res <- create_bins(train_tree_binned[[v]], test_tree_binned[[v]], n_bins = 5)
+  train_tree_binned[[paste0(v, "_bin")]] <- res$train_bin
+  test_tree_binned[[paste0(v, "_bin")]]  <- res$test_bin
+}
+```
+
+Next, we will collapse categories of **Loan Purpose** and **Education Level** like we did for **Employment Status** and **Grade Sub-grade**.
+We will also convert these categorical variables to **factor variables**. These **factor variables** will be then **one hot encoded** and **target encoded** during k-fold cross validation. Also, we will be supplying factor variables in three forms - raw, one hot encoded, and target encoded - in an incremental way. The strategy remains the same as before followed in numeric variables.
+
+
+```{r tree_factors}
+# Simplify Categorical Variables
+train_tree_factors <-  train_tree_binned %>%
+                  mutate(
+                  loan_purpose_main = case_when(
+                    loan_purpose == "Business" ~ "Business",
+                    loan_purpose == "Home" ~ "Home",
+                    loan_purpose == "Debt consolidation" ~ "Debt consolidation",
+                    loan_purpose %in% c("Education", "Medical") ~ "Education & Medical",
+                    TRUE ~ "Other Purposes"
+                  ),
+                  education_level_main = case_when(
+                    education_level == "Bachelor's" ~ "Bachelor's",
+                    education_level == "High School" ~ "High School",
+                    education_level == "PhD" ~ "PhD",
+                    TRUE ~ "Others"
+                  )
+                )
+
+test_tree_factors <-  test_tree_binned %>%
+                  mutate(
+                  loan_purpose_main = case_when(
+                    loan_purpose == "Business" ~ "Business",
+                    loan_purpose == "Home" ~ "Home",
+                    loan_purpose == "Debt consolidation" ~ "Debt consolidation",
+                    loan_purpose %in% c("Education", "Medical") ~ "Education & Medical",
+                    TRUE ~ "Other Purposes"
+                  ),
+                  education_level_main = case_when(
+                    education_level == "Bachelor's" ~ "Bachelor's",
+                    education_level == "High School" ~ "High School",
+                    education_level == "PhD" ~ "PhD",
+                    TRUE ~ "Others"
+                  )
+                )
+
+# Convert to factors               
+train_tree_factors <- train_tree_factors %>%
+                mutate_if(sapply(train_tree_factors, is.character), as.factor)
+
+test_tree_factors <- test_tree_factors %>%
+                mutate_if(sapply(test_tree_factors, is.character), as.factor)
+
+# Convert Working Flag to factors as well
+train_tree_factors$working_flag <- factor(train_tree_factors$working_flag, levels = c(0,1))
+
+test_tree_factors$working_flag <- factor(test_tree_factors$working_flag, levels = c(0,1))
+
+# Create factor form of Grade variable as well
+train_tree_factors$grade_factor <- factor(train_tree_factors$grade)
+
+test_tree_factors$grade_factor <- factor(test_tree_factors$grade)
+```
+
+Finally, we will be creating following interaction variables based on business intuition and domain knowledge:
+
+- DTI x Credit Score
+- DTI x Employment Status
+- DTI x Annual Income
+- DTI x Loan Purpose
+- Interest Rate x Credit Score
+- Annual Income x Education Level
+- Employment Status x Annual Income
+- Employment Status x Credit Score
+
+```{r interaction_vars}
+# Interaction between Numeric Variables 
+train_tree_num_intr <- train_tree_factors %>% mutate(
+                                                    dti_cs = debt_to_income_ratio*credit_score,
+                                                    dti_annual_income = debt_to_income_ratio*annual_income,
+                                                    dti_es = debt_to_income_ratio*as.numeric(working_flag),
+                                                    ir_cs = interest_rate*credit_score,
+                                                    es_annual_income = as.numeric(working_flag)*annual_income,
+                                                    es_cs = as.numeric(working_flag)*credit_score
+                                                    )
+
+test_tree_num_intr <- test_tree_factors %>% mutate(
+                                                    dti_cs = debt_to_income_ratio*credit_score,
+                                                    dti_annual_income = debt_to_income_ratio*annual_income,
+                                                    dti_es = debt_to_income_ratio*as.numeric(working_flag),
+                                                    ir_cs = interest_rate*credit_score,
+                                                    es_annual_income = as.numeric(working_flag)*annual_income,
+                                                    es_cs = as.numeric(working_flag)*credit_score
+                                                    )
+# Interaction between Factor and Numeric Variables 
+# DTI x Loan Purpose
+loan_purpose_dummies <- model.matrix(~ loan_purpose_main - 1, data = train_tree_num_intr) %>% as.data.frame() %>% as_tibble()
+
+dti_loan_purpose <- loan_purpose_dummies*train_tree_num_intr$debt_to_income_ratio
+
+loan_purpose_dummies_test <- model.matrix(~ loan_purpose_main - 1, data = test_tree_num_intr) %>% as.data.frame() %>% as_tibble()
+
+dti_loan_purpose_test <- loan_purpose_dummies_test*test_tree_num_intr$debt_to_income_ratio
+
+# Annual Income x Education Level
+education_lvl_dummies <- model.matrix(~ education_level_main - 1, data = train_tree_num_intr) %>% as.data.frame() %>% as_tibble()
+
+ed_lvl_income <- education_lvl_dummies*train_tree_num_intr$annual_income
+
+education_lvl_dummies_test <- model.matrix(~ education_level_main - 1, data = test_tree_num_intr) %>% as.data.frame() %>% as_tibble()
+
+ed_lvl_income_test <- education_lvl_dummies_test*test_tree_num_intr$annual_income
+
+# Bind all in one final data frame
+train_tree_final <- train_tree_num_intr %>%
+                    bind_cols(dti_loan_purpose) %>%
+                    bind_cols(ed_lvl_income)
+
+test_tree_final <- test_tree_num_intr %>%
+                    bind_cols(dti_loan_purpose_test) %>%
+                    bind_cols(ed_lvl_income_test)
+```
+
+We are entering now engineering or leaderboard hacking phase. I need a better understanding of this. For now, I am trying to implement it on top of my existing feature space to see what magic happens with it.
+
+```{r bin_interactions}
+# Create function to apply interactions with binned variables
+encode_int <- function(x) {
+  as.integer(factor(x))
+}
+
+add_bin_interaction <- function(df, bin_col, cat_col) {
+  df <- df %>% as_tibble()
+  
+  # Convert to integer encoding (robust for tree models)
+  bin_int <- encode_int(df[[bin_col]])
+  cat_int <- encode_int(df[[cat_col]])
+  
+  # New interaction column name
+  new_col <- paste0(bin_col, "_x_", cat_col)
+
+  df[[new_col]] <- bin_int * cat_int
+
+  return(df)
+}
+
+interactions <- list(
+  c("credit_score_bin", "working_flag"),
+  c("credit_score_bin", "loan_purpose_main"),
+  c("debt_to_income_ratio_bin", "working_flag"),
+  c("debt_to_income_ratio_bin", "loan_purpose_main"),
+  c("annual_income_bin", "education_level_main")
+)
+
+# apply to train
+for (pair in interactions) {
+  train_tree_final <- add_bin_interaction(train_tree_final, pair[1], pair[2])
+}
+
+# apply to test
+for (pair in interactions) {
+  test_tree_final <- add_bin_interaction(test_tree_final, pair[1], pair[2])
+}
+````
+```{r count_encoding}
+# Create function for count encoding
+count_encode <- function(df, col) {
+  col_quo <- enquo(col)
+  col_nm  <- quo_name(col_quo)
+
+  df %>%
+    add_count(!!col_quo, name = paste0(col_nm, "_count"))
+}
+
+# Apply count encoding to train and test datasets
+train_count_enc <- train_tree_final %>%
+            count_encode(loan_purpose_main) %>%
+            count_encode(education_level_main) %>%
+            count_encode(grade_factor) %>%
+            count_encode(debt_to_income_ratio_bin) %>%
+            count_encode(credit_score_bin) %>%
+            count_encode(annual_income_bin)
+
+test_count_enc <- test_tree_final %>%
+            count_encode(loan_purpose_main) %>%
+            count_encode(education_level_main) %>%
+            count_encode(grade_factor) %>%
+            count_encode(debt_to_income_ratio_bin) %>%
+            count_encode(credit_score_bin) %>%
+            count_encode(annual_income_bin)
+```
+
+```{r group_stats}
+# Create function to add group statistics of selected columns
+add_group_stats <- function(df, group_col, value_col){
+  group_col <- rlang::sym(group_col)
+  value_col <- rlang::sym(value_col)
+
+  stats_df <- df %>%
+              group_by(!!group_col) %>%
+              summarise(
+                mean = mean(!!value_col, na.rm = TRUE),
+                median = median(!!value_col, na.rm = TRUE),
+                sd = sd(!!value_col, na.rm = TRUE),
+                .groups = "drop"
+              ) %>%
+              rename(
+                !!paste0(group_col,"_", value_col, "_mean") := mean,
+                !!paste0(group_col,"_", value_col, "_median") := median,
+                !!paste0(group_col,"_", value_col, "_sd") := sd
+              )
+              df %>% left_join(stats_df, by = rlang::as_string(group_col))
+}
+
+# Apply group stats function to train and test dataset
+train_group_stats <- train_count_enc %>% add_group_stats("loan_purpose_main", "debt_to_income_ratio") %>%
+add_group_stats("loan_purpose_main", "credit_score") %>%
+add_group_stats("loan_purpose_main", "interest_rate") %>%
+add_group_stats("loan_purpose_main", "annual_income")
+
+test_group_stats <- test_count_enc %>% add_group_stats("loan_purpose_main", "debt_to_income_ratio") %>%
+add_group_stats("loan_purpose_main", "credit_score") %>%
+add_group_stats("loan_purpose_main", "interest_rate") %>%
+add_group_stats("loan_purpose_main", "annual_income")
+```
+
+```{r oof_target_encoding}
+# Create Folds
+folds <- createFolds(train_group_stats$loan_paid_back, k = 5)
+
+# Create function to apply OOF Target Encoding to train and test datasets
+oof_target_encode <- function(train, test, col, target, folds){
+
+  train <- as_tibble(train)
+  test  <- as_tibble(test)
+
+  col_sym <- rlang::sym(col)
+  target_sym <- rlang::sym(target)
+
+  global_mean <- mean(train[[target]], na.rm = TRUE)
+  oof <- rep(NA_real_, nrow(train))
+
+  # ----------------------
+  # PART 1 — TRAIN OOF TE
+  # ----------------------
+  for (i in seq_along(folds)){
+    val_idx <- folds[[i]]
+    train_idx <- setdiff(seq_len(nrow(train)), val_idx)
+
+    te_map <- train[train_idx, ] %>%
+      group_by(!!col_sym) %>%
+      summarise(te = mean(!!target_sym), .groups = "drop")
+
+    tmp <- train[val_idx, ] %>%
+      left_join(te_map, by = col)
+
+    tmp$te[is.na(tmp$te)] <- global_mean
+
+    oof[val_idx] <- tmp$te
+  }
+
+  # Add new OOF TE column (keeps all previous columns)
+  te_col <- paste0(col, "_te")
+  train[[te_col]] <- oof
+
+  # ----------------------
+  # PART 2 — TEST FULL TE
+  # ----------------------
+  full_map <- train %>%
+    group_by(!!col_sym) %>%
+    summarise(te = mean(!!target_sym), .groups = "drop")
+
+  test <- test %>%
+    left_join(full_map, by = col)
+
+  # Rename 'te' to correct name
+  test <- test %>% rename(!!te_col := te)
+
+  # Replace NA values
+  test[[te_col]][is.na(test[[te_col]])] <- global_mean
+  
+  # ----------------------
+  # Crucial: return FULL train, not a new one
+  # ----------------------
+  return(list(train_te = train, test_te = test))
+}
+
+
+# Apply OOF TE Encoding 
+te_vars <- c("loan_purpose_main", "education_level_main", "grade_factor", "debt_to_income_ratio_bin", "credit_score_bin", "annual_income_bin")
+
+train_te <- train_group_stats
+test_te <- test_group_stats
+
+for (v in te_vars){
+  res <- oof_target_encode(train_te, test_te, v, "loan_paid_back", folds)
+  train_te <- res$train_te
+  test_te <- res$test_te
+}
+```
+
+```{r save_tree_datasets}
+# Clean Column Names
+train_tree_final <- clean_names(train_tree_final)
+test_tree_final  <- clean_names(test_tree_final)
+
+# Clean Column Names of Target Encoded datasets
+train_tree_final_te <- as.data.table(clean_names(train_te))
+test_tree_final_te  <- as.data.table(clean_names(test_te))
+
 
 # Save Datasets
-save(train_tree, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_tree.Rdata")
+save(train_tree_final, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_tree_final.Rdata")
 
-save(test_tree, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_tree.Rdata")
+save(test_tree_final, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_tree_final.Rdata")
+
+save(train_tree_final_te, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_tree_final_te.Rdata")
+
+save(test_tree_final_te, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_tree_final_te.Rdata")
 ```
 
 
