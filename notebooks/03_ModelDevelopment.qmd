@@ -56,10 +56,12 @@ load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_f
 load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_final_lr.Rdata")
 
 # Load Model Data for Tree-based Models
-load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_tree.Rdata")
+load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_tree_final.Rdata")
+load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_tree_final_te.Rdata")
 
 # Load Test Data for Tree-based Models
-load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_tree.Rdata")
+load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_tree_final.Rdata")
+load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_tree_final_te.Rdata")
 ```
 
 ## Model Development
@@ -145,16 +147,20 @@ summary(final_model_interaction)
 waldtest(final_model, final_model_interaction)
 ```
 
-### XGBoost - k-fold Cross-Validation
+### XGBoost - Base Model using k-fold cross-validation (Iteration 1)
 
-```{r xgb_cv}
+In base model, we will be adding numeric variables in their raw form, factor variables in their one-hot encoded form and transformed form with key interaction terms that we utilized in our logistic regression model as well. These interaction terms are DTI x Credit Score and Credit Score x Interest Rate.
+
+Let's see the AUC of this base model. 
+
+```{r xgb_cv_iter1}
 # Create train and validation split 
-train_idx <- createDataPartition(train_tree$loan_paid_back, p = 0.8, list = FALSE)
-train_xgb <- train_tree[train_idx]
-valid_xgb <- train_tree[-train_idx]
+train_idx <- createDataPartition(train_tree_final$loan_paid_back, p = 0.8, list = FALSE)
+train_xgb <- train_tree_final[train_idx]
+valid_xgb <- train_tree_final[-train_idx]
 
 # Full formula 
-feature_formula <- ~ annual_income + debt_to_income_ratio + credit_score + interest_rate + loan_to_income_ratio + education_level + loan_purpose + working_flag + grade - 1
+feature_formula <- ~ annual_income + debt_to_income_ratio + credit_score + interest_rate + education_level + loan_purpose + employment_status + grade_subgrade + working_flag + grade + loan_purpose_main + education_level_main + grade_factor + dti_cs + ir_cs - 1
 
 # Convert to DMatrix 
 train_xgb_matrix <- model.matrix(feature_formula, data = train_xgb)
@@ -196,8 +202,8 @@ xgb_cv <- xgb.cv(
 
 best_nrounds <- xgb_cv$early_stop$best_iteration
 
-# Train Final Model
-xgb_final_model <- xgb.train(
+# Train Base Model
+xgb_base_model <- xgb.train(
   params = params,
   data = dtrain,
   nrounds = best_nrounds,
@@ -206,13 +212,161 @@ xgb_final_model <- xgb.train(
 )
 
 # Predict on test dataset
-test_xgb_matrix <- model.matrix(feature_formula, data = test_tree)
-test_pred_xgb  <- predict(xgb_final_model, test_xgb_matrix)
-submission_xgb <- data.frame(
-  id = test_tree$id,
+test_xgb_matrix <- model.matrix(feature_formula, data = test_tree_final)
+test_pred_xgb  <- predict(xgb_base_model, test_xgb_matrix)
+submission_xgb_itr01 <- data.frame(
+  id = test_tree_final$id,
   loan_paid_back = test_pred_xgb
 )
 
 # Save to csv
-write.csv(submission_xgb, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_xgb1.csv", row.names = FALSE)
+write.csv(submission_xgb_itr01, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_xgb_base.csv", row.names = FALSE)
 ```
+
+### XGBoost - Base Model with full set of features using k-fold cross-validation (Iteration 2)
+
+```{r xgb_cv_iter2}
+# Create train and validation split 
+train_idx <- createDataPartition(train_tree_final$loan_paid_back, p = 0.8, list = FALSE)
+train_xgb <- train_tree_final[train_idx]
+valid_xgb <- train_tree_final[-train_idx]
+
+# Full formula 
+feature_formula <- ~ . - id - loan_paid_back - 1
+
+# Convert to DMatrix 
+train_xgb_matrix <- model.matrix(feature_formula, data = train_xgb)
+valid_xgb_matrix <- model.matrix(feature_formula, data = valid_xgb)
+
+dtrain <- xgb.DMatrix(train_xgb_matrix, label = train_xgb$loan_paid_back)
+dvalid <- xgb.DMatrix(valid_xgb_matrix, label = valid_xgb$loan_paid_back)
+
+# Estimate Weight 
+neg <- sum(train_xgb$loan_paid_back == 0)
+pos <- sum(train_xgb$loan_paid_back == 1)
+scale_pos_weight <- neg/pos
+
+# Baseline parameters
+params <- list(
+  booster = "gbtree",
+  objective = "binary:logistic",
+  eval_metric = "auc",
+  eta = 0.03,
+  max_depth = 5,
+  min_child_weight = 30,
+  subsample = 0.8,
+  colsample_bytree = 0.6,
+  gamma = 1,
+  lambda = 2,
+  scale_pos_weight = scale_pos_weight
+)
+
+# Perform k-fold Cross-validation
+xgb_cv <- xgb.cv(
+  data = dtrain,
+  param = params,
+  nrounds = 5000,
+  nfold = 10,
+  early_stopping_rounds = 50,
+  maximize = TRUE,
+  verbose = 1
+)
+
+best_nrounds <- xgb_cv$early_stop$best_iteration
+
+# Train Base Model with interactions
+xgb_base_model_with_interactions <- xgb.train(
+  params = params,
+  data = dtrain,
+  nrounds = best_nrounds,
+  evals = list(train=dtrain, valid=dvalid),
+  early_stopping_rounds = 50
+)
+
+# Predict on test dataset
+feature_formula_test <-  ~ . - id - 1
+test_xgb_matrix <- model.matrix(feature_formula_test, data = test_tree_final)
+test_pred_xgb  <- predict(xgb_base_model_with_interactions, test_xgb_matrix)
+submission_xgb_iter02 <- data.frame(
+  id = test_tree_final$id,
+  loan_paid_back = test_pred_xgb
+)
+
+# Save to csv
+write.csv(submission_xgb_iter02, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_xgb_full.csv", row.names = FALSE)
+```
+
+
+### XGBoost - Base Model with full set of features and target encoding using k-fold cross-validation (Iteration 3)
+
+```{r xgb_cv_iter3}
+# Create train and validation split 
+train_idx <- createDataPartition(train_tree_final_te$loan_paid_back, p = 0.8, list = FALSE)
+train_xgb <- train_tree_final_te[train_idx]
+valid_xgb <- train_tree_final_te[-train_idx]
+
+# Full formula 
+feature_formula <- ~ . - id - loan_paid_back - 1
+
+# Convert to DMatrix 
+train_xgb_matrix <- model.matrix(feature_formula, data = train_xgb)
+valid_xgb_matrix <- model.matrix(feature_formula, data = valid_xgb)
+
+dtrain <- xgb.DMatrix(train_xgb_matrix, label = train_xgb$loan_paid_back)
+dvalid <- xgb.DMatrix(valid_xgb_matrix, label = valid_xgb$loan_paid_back)
+
+# Estimate Weight 
+neg <- sum(train_xgb$loan_paid_back == 0)
+pos <- sum(train_xgb$loan_paid_back == 1)
+scale_pos_weight <- neg/pos
+
+# Baseline parameters
+params <- list(
+  booster = "gbtree",
+  objective = "binary:logistic",
+  eval_metric = "auc",
+  eta = 0.03,
+  max_depth = 5,
+  min_child_weight = 30,
+  subsample = 0.8,
+  colsample_bytree = 0.6,
+  gamma = 1,
+  lambda = 2,
+  scale_pos_weight = scale_pos_weight
+)
+
+# Perform k-fold Cross-validation
+xgb_cv <- xgb.cv(
+  data = dtrain,
+  param = params,
+  nrounds = 5000,
+  nfold = 10,
+  early_stopping_rounds = 50,
+  maximize = TRUE,
+  verbose = 1
+)
+
+best_nrounds <- xgb_cv$early_stop$best_iteration
+
+# Train Base Model with Advanced Feature Engineering
+xgb_base_model_afe <- xgb.train(
+  params = params,
+  data = dtrain,
+  nrounds = best_nrounds,
+  evals = list(train=dtrain, valid=dvalid),
+  early_stopping_rounds = 50
+)
+
+# Predict on test dataset
+feature_formula_test <-  ~ . - id - 1
+test_xgb <- model.matrix(feature_formula_test, data = test_tree_final_te)
+test_pred_xgb  <- predict(xgb_base_model_afe, test_xgb)
+submission_xgb_iter03 <- data.frame(
+  id = test_tree_final_te$id,
+  loan_paid_back = test_pred_xgb
+)
+
+# Save to csv
+write.csv(submission_xgb_iter03, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_xgb_full_te.csv", row.names = FALSE)
+```
+

@@ -754,7 +754,7 @@ Now, let's look at the relationship between Credit Score and Good Rate (Rate of 
 #| fig.width: 12
 #| fig.height: 8
 #| fig.align: "center"
-plot_bubble_chart(train_num_bins, CreditScore_Bins, loan_paid_back,  "Bubble Plot of Credit Score by Loan Repayment Rate", "Gender")
+plot_bubble_chart(train_num_bins, CreditScore_Bins, loan_paid_back,  "Bubble Plot of Credit Score by Loan Repayment Rate", "Credit Score")
 ```
 
 As it can be seen from the above chart, the loan repayment rate increases with increasing Credit Score, confirming our business intiuition that better credit score corresponds to lower default risk.
@@ -767,7 +767,7 @@ Next, we will look at the relationship between Interest Rate and Good Rate (Rate
 #| fig.width: 12
 #| fig.height: 8
 #| fig.align: "center"
-plot_bubble_chart(train_num_bins, InterestRate_Bins, loan_paid_back,  "Bubble Plot of Interest Rate by Loan Repayment Rate", "Gender")
+plot_bubble_chart(train_num_bins, InterestRate_Bins, loan_paid_back,  "Bubble Plot of Interest Rate by Loan Repayment Rate", "Interest Rate")
 ```
 
 As it can be seen from the above chart, the loan repayment rate decreases with increasing Interest Rate, confirming our business intiuition that increasing interest rate corresponds to higher default risk.
@@ -780,7 +780,7 @@ Here, instead of creating separate bubble plots for loan amount and annual incom
 #| fig.width: 12
 #| fig.height: 8
 #| fig.align: "center"
-plot_bubble_chart(train_num_bins, LTI_Bins, loan_paid_back,  "Bubble Plot of LTI by Loan Repayment Rate", "Gender")
+plot_bubble_chart(train_num_bins, LTI_Bins, loan_paid_back,  "Bubble Plot of LTI by Loan Repayment Rate", "LTI")
 ```
 
 As it can be seen from the above chart, the loan repayment rate has a non-monotonic relationship with LTI. The repayment probability first rises and then falls.
