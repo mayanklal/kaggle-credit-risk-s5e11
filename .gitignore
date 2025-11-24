@@ -18,6 +18,9 @@ data/processed/*
 # === Ignore VS Code settings ===
 .vscode/
 
+# === Ignore outputs ===
+outputs
+
 
 /.quarto/
 **/*.quarto_ipynb
