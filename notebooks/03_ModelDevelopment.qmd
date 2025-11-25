@@ -40,7 +40,7 @@ library(lmtest) # Joint Wald Test
 library(Matrix) # Create Matrix objects for XGBoost
 library(xgboost) # XGBoost
 library(caret) # Stratified Splitting
-library(SHAPforxgboost) # Interpretability
+#library(SHAPforxgboost) # Interpretability
 
 # Tidy Modeling
 library(tidymodels)
@@ -425,7 +425,7 @@ xgb_spec <- boost_tree(
   sample_size = tune(), mtry = tune(),         ## randomness
   learn_rate = tune()                          ## step size
 ) %>%
-  set_engine("xgboost", eval_metric = "auc") %>%
+  set_engine("xgboost", eval_metric = "auc", device = "cuda") %>%
   set_mode("classification")
 
 xgb_spec
@@ -444,15 +444,20 @@ xgb_grid <- grid_space_filling(
 xgb_grid
 
 # Specify Workflow
+xgb_rec <- recipe(loan_paid_back ~ ., data = vb_train) %>%
+  step_zv(all_predictors()) %>%
+  step_dummy(all_nominal_predictors())
+
 xgb_wf <- workflow() %>%
-  add_formula(loan_paid_back ~ .) %>%
-  add_model(xgb_spec)
+  add_model(xgb_spec) %>%
+  add_recipe(xgb_rec)
+
 
 xgb_wf
 
 # Specify folds for k-fold cross-validation
 set.seed(123)
-vb_folds <- vfold_cv(vb_train, strata = loan_paid_back, v = 7)
+vb_folds <- vfold_cv(vb_train, strata = loan_paid_back, v = 3)
 
 vb_folds
 
@@ -476,7 +481,7 @@ collect_metrics(xgb_res)
 xgb_res %>%
   collect_metrics() %>%
   filter(.metric == "roc_auc") %>%
-  select(mean, mtry:sample_size) %>%
+  dplyr::select(mean, mtry:sample_size) %>%
   pivot_longer(mtry:sample_size,
                values_to = "value",
                names_to = "parameter"
@@ -487,8 +492,8 @@ xgb_res %>%
   labs(x = NULL, y = "AUC")
 
 # Find and save best metrics
-show_best(xgb_res, "roc_auc")
-best_auc <- select_best(xgb_res, "roc_auc")
+show_best(xgb_res, metric = "roc_auc")
+best_auc <- select_best(xgb_res, metric = "roc_auc")
 best_auc
 
 # Finalize tuneable workflow
@@ -498,4 +503,26 @@ final_xgb <- finalize_workflow(
 )
 
 final_xgb
+
+# Find Parameters 
+final_xgb %>%
+    fit (data = vb_train) %>%
+    pull_workflow_fit() %>%
+    vip(geom = "point")
+
+# Evaluate model using best fit
+final_res <- last_fit(final_xgb, vb_split)
+collect_metrics(final_res)
+
+# Create ROC curve
+final_res %>%
+    collect_predictions() %>%
+    roc_curve(truth = loan_paid_back,.pred_1, event_level = "second") %>%
+    ggplot(aes(x = 1 - specificity, y = sensitivity)) +
+    geom_line(size = 1.5, color = "midnightblue") +
+    geom_abline(
+      lty = 2, alpha = 0.5,
+      color = "gray50",
+      size = 1.2
+    )
 ```
