@@ -48,6 +48,8 @@ library(recipes)
 library(moments)
 library(rlang)
 library(vip)
+library(future)
+library(future.apply)
 ```
 
 This is a rough sketch notebook. We will furnish it before publishing.
@@ -64,13 +66,9 @@ load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_fi
 
 # Load Model Data for Tree-based Models
 load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_tree.Rdata")
-load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_tree_encoded.Rdata")
-load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_tree_agg.Rdata")
 
 # Load Test Data for Tree-based Models
 load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_tree.Rdata")
-load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_tree_encoded.Rdata")
-load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_tree_agg.Rdata")
 ```
 
 ## Model Development
@@ -241,183 +239,19 @@ importance_matrix <- xgb.importance(
 xgb.plot.importance(importance_matrix)
 ```
 
-### XGBoost - Base Model with encoding of categorical variables (Iteration 2)
+### XGBoost - Tidymodels (Iteration 2)
+
+Based on discussions on Kaggle, I realized that my model development workflow is heavily flawed. <Will elaborate on why is it flawed later on.> To bridge the gap between my workflow and my peers' workflow, I will now use tidymodels based workflow. <Will elaborte on what is tidymodels and how it helps later on.>
 
 ```{r xgb_cv_iter02}
-# Create train and validation split 
-train_idx <- createDataPartition(train_tree_encoded$loan_paid_back, p = 0.8, list = FALSE)
-train_xgb <- train_tree_encoded[train_idx]
-valid_xgb <- train_tree_encoded[-train_idx]
-
-# Full formula 
-feature_formula <- ~ . - id - loan_paid_back - 1
-
-# Convert to DMatrix 
-train_xgb_matrix <- model.matrix(feature_formula, data = train_xgb)
-valid_xgb_matrix <- model.matrix(feature_formula, data = valid_xgb)
-
-dtrain <- xgb.DMatrix(train_xgb_matrix, label = train_xgb$loan_paid_back)
-dvalid <- xgb.DMatrix(valid_xgb_matrix, label = valid_xgb$loan_paid_back)
-
-# Estimate Weight 
-neg <- sum(train_xgb$loan_paid_back == 0)
-pos <- sum(train_xgb$loan_paid_back == 1)
-scale_pos_weight <- neg/pos
-
-# Baseline parameters
-params <- list(
-  booster = "gbtree",
-  objective = "binary:logistic",
-  eval_metric = "auc",
-  eta = 0.03,
-  max_depth = 5,
-  min_child_weight = 30,
-  subsample = 0.8,
-  colsample_bytree = 0.6,
-  gamma = 1,
-  lambda = 2,
-  scale_pos_weight = scale_pos_weight
-)
-
-# Perform k-fold Cross-validation
-xgb_cv <- xgb.cv(
-  data = dtrain,
-  param = params,
-  nrounds = 5000,
-  nfold = 10,
-  early_stopping_rounds = 50,
-  maximize = TRUE,
-  verbose = 1
-)
-
-best_nrounds <- xgb_cv$early_stop$best_iteration
-
-# Train Model
-xgb_model_post_encode <- xgb.train(
-  params = params,
-  data = dtrain,
-  nrounds = best_nrounds,
-  evals = list(train=dtrain, valid=dvalid),
-  early_stopping_rounds = 50
-)
-
-# Predict on test dataset
-feature_formula_test <- ~ . - id - 1
-test_xgb_matrix <- model.matrix(feature_formula_test, data = test_tree_encoded)
-test_pred_xgb  <- predict(xgb_model_post_encode, test_xgb_matrix)
-submission_xgb_itr02 <- data.frame(
-  id = test_tree_encoded$id,
-  loan_paid_back = test_pred_xgb
-)
-
-# Save to csv
-write.csv(submission_xgb_itr02, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_xgb_iter02.csv", row.names = FALSE)
-
-# Feature Importance 
-importance_matrix <- xgb.importance(
-  model = xgb_model_post_encode,
-  feature_names = colnames(dtrain)
-)
-
-xgb.plot.importance(importance_matrix)
-```
-
-### XGBoost - Aggregating Statistics of Numerical Variable by Categorical Variables (Iteration 3)
-
-```{r xgb_cv_iter03}
-# Create train and validation split 
-train_idx <- createDataPartition(train_tree_agg$loan_paid_back, p = 0.8, list = FALSE)
-train_xgb <- train_tree_agg[train_idx]
-valid_xgb <- train_tree_agg[-train_idx]
-
-# Full formula 
-feature_formula <- ~ . - id - loan_paid_back - 1
-
-# Convert to DMatrix 
-train_xgb_matrix <- model.matrix(feature_formula, data = train_xgb)
-valid_xgb_matrix <- model.matrix(feature_formula, data = valid_xgb)
-
-dtrain <- xgb.DMatrix(train_xgb_matrix, label = train_xgb$loan_paid_back)
-dvalid <- xgb.DMatrix(valid_xgb_matrix, label = valid_xgb$loan_paid_back)
-
-# Estimate Weight 
-neg <- sum(train_xgb$loan_paid_back == 0)
-pos <- sum(train_xgb$loan_paid_back == 1)
-scale_pos_weight <- neg/pos
-
-# Baseline parameters
-params <- list(
-  booster = "gbtree",
-  objective = "binary:logistic",
-  eval_metric = "auc",
-  #tree_method = "gpu_hist",
-  #predictor = "gpu_predictor",
-  max_depth = 5,
-  eta = 0.03,
-  min_child_weight = 50, # Incresed from 30 to 50 to reduce overfitting
-  subsample = 0.8,
-  colsample_bytree = 0.8, # Increased from 0.6 to 0.8 
-  gamma = 1,
-  lambda = 2,
-  scale_pos_weight = scale_pos_weight
-)
-
-# Perform k-fold Cross-validation
-xgb_cv <- xgb.cv(
-  data = dtrain,
-  param = params,
-  nrounds = 5000,
-  nfold = 10,
-  early_stopping_rounds = 50,
-  maximize = TRUE,
-  verbose = 1
-)
-
-best_nrounds <- xgb_cv$early_stop$best_iteration
-
-# Train Model
-xgb_model_agg <- xgb.train(
-  params = params,
-  data = dtrain,
-  nrounds = best_nrounds,
-  evals = list(train=dtrain, valid=dvalid),
-  early_stopping_rounds = 50
-)
-
-# Predict on test dataset
-feature_formula_test <- ~ . - id - 1
-test_xgb_matrix <- model.matrix(feature_formula_test, data = test_tree_agg)
-test_pred_xgb  <- predict(xgb_model_agg, test_xgb_matrix)
-submission_xgb_itr03 <- data.frame(
-  id = test_tree_agg$id,
-  loan_paid_back = test_pred_xgb
-)
-
-# Save to csv
-write.csv(submission_xgb_itr03, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_xgb_iter03.csv", row.names = FALSE)
-
-# Feature Importance 
-importance_matrix <- xgb.importance(
-  model = xgb_model_agg,
-  feature_names = colnames(dtrain)
-)
-
-xgb.plot.importance(importance_matrix[1:20,])
-```
-
-### XGBoost - Tidymodels (Iteration 4)
-
-Based on discussions on Kaggle, I realized that my model development workflow is heavily flawed. <Will elaborate on why is it flawed later on?> To bridge the gap between my workflow and my peers' workflow, I will now use tidymodels based workflow. <Will elaborte on what is tidymodels and how it helps later on>
-
-```{r xgb_cv_iter04}
 # Prepare datasets
-vb_df <- train_tree_encoded %>% dplyr::select(-id)
+vb_df <- train_tree %>% dplyr::select(-id)
 vb_df$loan_paid_back <- factor(vb_df$loan_paid_back, levels = c(0, 1))
 vb_split <- initial_split(vb_df, strata = loan_paid_back)
 vb_train <- training(vb_split)
 vb_test <- testing(vb_split)
 
-# Specify paramters of XGBOost Model that needs to be tuned
+# Specify paramters of XGBoost Model that needs to be tuned
 xgb_spec <- boost_tree(
   trees = 1000,
   tree_depth = tune(), min_n = tune(),
@@ -525,4 +359,227 @@ final_res %>%
       color = "gray50",
       size = 1.2
     )
+
+# Extract workflow
+final_wf <- final_res %>% extract_workflow()
+
+# Predict on test dataset
+test_pred <- predict(final_wf, test_tree, type = "prob")
+submission_xgb_itr04 <- data.frame(
+  id = test_tree$id,
+  loan_paid_back = test_pred$.pred_1
+)
+
+# Save to csv
+write.csv(submission_xgb_itr02, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_xgb_iter02.csv", row.names = FALSE)
+```
+
+
+### XGBoost - Tidymodels (Iteration 3)
+
+This is my first attempt at advanced feature engineering as demonstrated by **Chris Deotte** in his [notebook](https://www.kaggle.com/code/cdeotte/feature-engineering-with-rapids-lb-38-847).
+
+Earlier I tried to implement it separately and outside of my model training workflow. But I got limited success in that. So, I will be trying this again now within my training workflow using tidymodels.
+
+Let's see how much success we get at this attempt. I have created following helper functions to perform advanced feature engineering:
+
+- **Binning of continuous variables**: Quantile for skewed continuous variables and fixed binning for normally distributed continuous variables.
+- **Interaction variables**: Interaction between key numeric and factor variables
+- **Target encoding**: Encoding of categorical variables based on target variable
+- **Aggregated encoding**: Encoding of categoricl variables using aggregate statistics.
+
+This code is written mostly by **ChatGPT** with bug fixes by me.
+
+```{r xgb_cv_iter03}
+# Prepare datasets
+dt_train <- train_tree %>% dplyr::select(-id)
+dt_train$loan_paid_back <- factor(dt_train$loan_paid_back, levels = c(0,1))
+
+# Define target variable 
+target <- "loan_paid_back"
+
+# Define features
+features <- names(dt_train[, -c("loan_paid_back")])
+numeric <- names(dt_train[, .SD, .SDcols = is.numeric])
+factors <- names(dt_train[,.SD, .SDcols = setdiff(names(dt_train), union(numeric, target))])
+
+# Create sample dataset for fast running and testing of code
+sample_frac <- 0.25
+dt_sample <- dt_train[, .SD[sample(.N, max(1, floor(.N * sample_frac)))], by = loan_paid_back]
+
+# Enable parallel processing for FE functions
+plan(multicore, workers = min(4, parallel::detectCores() - 1))  # adjust as needed
+
+# prevent BLAS oversubscription
+Sys.setenv(OPENBLAS_NUM_THREADS = 1)
+Sys.setenv(MKL_NUM_THREADS      = 1)
+data.table::setDTthreads(1)   # or 2 if you have many cores
+
+# Check if GPU has been enabled
+future::supportsMulticore()
+future::nbrOfWorkers()
+future::nbrOfFreeWorkers()
+
+# Check parallel execution
+# plan(multicore, workers = 4)
+
+# system.time({
+#   future_lapply(1:4, function(i) {
+#     Sys.sleep(3)   # simulate heavy work
+#     i
+#   })
+# })
+
+# res <- future_lapply(1:4, function(i) {
+#   list(i = i, pid = Sys.getpid())
+# })
+# res
+# unique(sapply(res, `[[`, "pid"))
+
+# Source feature engineering functions
+source("/workspace/Projects/kaggle-credit-risk-s5e11/step_functions/step_bigrams.R")
+source("/workspace/Projects/kaggle-credit-risk-s5e11/step_functions/step_rounding.R")
+source("/workspace/Projects/kaggle-credit-risk-s5e11/step_functions/step_agg_encoding.R")
+source("/workspace/Projects/kaggle-credit-risk-s5e11/step_functions/step_advanced_target_encoding.R")
+
+# Source function to run fold ensemble
+source("/workspace/Projects/kaggle-credit-risk-s5e11/step_functions/fold_ensemble.R")
+
+# Specify paramters of XGBoost Model that needs to be tuned
+xgb_spec <- boost_tree(
+  trees = 10000,             # n_estimators
+  tree_depth = 6,            # max_depth
+  learn_rate = 0.01,         # learning_rate
+  sample_size = 0.55,        # subsample
+  mtry = NULL,               # overridden below by colsample_bytree
+  loss_reduction = 0         # gamma, not in your params → set to 0
+) %>%
+  set_engine(
+    "xgboost",
+    objective = "binary:logistic",
+    eval_metric = "auc",
+    colsample_bytree = 0.3,        # colsample_bytree
+    early_stopping_rounds = 200,   # early stopping
+    enable_categorical = TRUE,
+    nthread = parallel::detectCores(),   # n_jobs = -1 equivalent
+    device = "cuda",
+    random_state = 42
+  ) %>%
+  set_mode("classification")
+
+xgb_spec
+
+# Create recipe
+xgb_rec <- recipe(loan_paid_back ~ ., data = dt_sample) %>%
+
+  # 1) create INTER features (bigram-style) — PREFIX added by your step_bigrams implementation
+  step_bigrams(
+    all_predictors(),
+    exclude = c("annual_income", "loan_amount", "loan_paid_back", "id")
+  ) %>%
+
+  # 2) create ROUND features (prefix ROUND_)
+  step_rounding(
+    annual_income, loan_amount,
+    round_levels = list(`1s` = 0, `10s` = -1)
+  ) %>%
+
+  # 3) (optional) orig mean/count features if you want them created before TE
+  step_agg_encoding(columns = features) %>%    # will create agg_* if you implemented prefix
+
+  # 4) TE1: advanced CV-based target encoding on only INTER features (drop original INTER columns)
+  step_advanced_target_encoding(
+    starts_with("inter_"),
+    aggs = "mean",
+    cv = 5,
+    smooth = "auto",
+    drop_original = TRUE
+  ) %>%
+
+  # 5) TE2: advanced CV-based target encoding on only ROUND features (keep originals)
+  step_advanced_target_encoding(
+    starts_with("round_"),
+    aggs = "mean",
+    cv = 5,
+    smooth = "auto",
+    drop_original = FALSE
+  ) %>%
+
+  # 6) Ensure all categorical variables are factors
+  step_mutate(across(all_of(factors), ~ as.factor(.))) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_zv(all_predictors())
+
+
+# Specify Workflow
+xgb_wf <- workflow() %>%
+  add_model(xgb_spec) %>%
+  add_recipe(xgb_rec)
+
+
+xgb_wf
+
+# Create CV folds
+start_time <- Sys.time()
+set.seed(123)
+cv_folds <- vfold_cv(dt_sample, v = 5, strata = loan_paid_back)
+
+
+# Run cross-validation
+set.seed(456)
+unlink("target_encoding_log.txt")
+cv_results <- fit_resamples(
+  xgb_wf,
+  resamples = cv_folds,
+  control = control_resamples(save_pred = TRUE)
+)
+
+# Find run time
+end_time <- Sys.time()
+print(paste("Running folds: ", end_time - start_time))
+
+# Extract OOF predictions
+oof_predictions <- collect_predictions(cv_results)
+
+# Compute OOF AUC
+oof_auc <- roc_auc(
+  oof_preds,
+  truth = loan_paid_back,
+  .pred_1
+)
+
+# Final fit
+final_fit <- fit(xgb_wf, data = vb_sample_df)
+
+# Create ROC curve
+final_fit %>%
+    collect_predictions() %>%
+    roc_curve(truth = loan_paid_back,.pred_1, event_level = "second") %>%
+    ggplot(aes(x = 1 - specificity, y = sensitivity)) +
+    geom_line(size = 1.5, color = "midnightblue") +
+    geom_abline(
+      lty = 2, alpha = 0.5,
+      color = "gray50",
+      size = 1.2
+    )
+
+# Predict on test dataset
+test_pred <- predict(final_fit, test_tree, type = "prob")
+submission_xgb_itr03 <- data.frame(
+  id = test_tree$id,
+  loan_paid_back = test_pred$.pred_1
+)
+
+# Save to csv
+write.csv(submission_xgb_itr03, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_xgb_iter03.csv", row.names = FALSE)
+
+# Run ensemble fold 
+results <- fold_ensemble(
+  train_df = train,      # your full training data
+  test_df  = test,       # your competition test
+  rec      = xgb_rec,    # your full recipe
+  mod      = xgb_spec,   # your xgboost spec
+  v        = 5,
+  target   = "loan_paid_back"
+)
 ```
