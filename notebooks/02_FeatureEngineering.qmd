@@ -448,22 +448,15 @@ save(test_final_lr, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/pr
 
 ### Tree-based Models (XGBoost, CatBoost, LightGBM)
 
-We are entering into advanced engineering phase required for tree-based models. We will be leveraging the advanced feature engineering phase as demonstrated by **Chris Deotte** in his [notebook](https://www.kaggle.com/code/cdeotte/feature-engineering-with-rapids-lb-38-847) for our follwing set of **candidate variables**:
+We are entering into advanced engineering phase required for tree-based models. We will be leveraging the advanced feature engineering phase as demonstrated by **Chris Deotte** in his [notebook](https://www.kaggle.com/code/cdeotte/feature-engineering-with-rapids-lb-38-847).
 
-- Debt to Income Ratio (DTI)
-- Credit Score
-- Interest Rate
-- Annual Income
-- Employment Status
-- Education Level
-- Grade Sub-grade
-- Loan Purpose
-
-We will try to engineer these variables to increase our feature space so that tree-based models can use the feature space to identify non-linear relationships that linear models like logistic regression aren't able to capture.
+We will try to engineer our existing variables to increase our feature space so that tree-based models can use the feature space to identify non-linear relationships that linear models like logistic regression aren't able to capture.
 
 As we have seen in our EDA, there are two variables - **DTI** and **Employment Status** with very high IV. This indicates that this data is synthetically created and we can leverage these two variables to improve our model performance.  
 
-In line with the guidance from Chris's notebook, we will be encoding our categorical variables using these two variables. But before doing that we will have to convert these categorical variables to factor variables.
+In line with the guidance from Chris's notebook, we will be performing feature engineering within the nested folds of our cross-validation based model training workflow. Therefore, we will be doing it in our **Model Development** notebook.
+
+Before going to it, I will combine tree and test datasets and convert all character variables to factor and remove the derived variables - **Grade** and **Working Flag**.
 
 ```{r tree_base}
 # Combine Train and Test Dataset together
@@ -483,133 +476,3 @@ save(train_tree, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/proce
 save(test_tree, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_tree.Rdata")
 ```
 
-After converting categorical variables to factor variables, we will now encode categorical variables using **Employment Status** and **DTI** using same methododology as shown in Chris' notebook.
-
-```{r tree_cat_encoding}
-# Create functions to perform categorical encoding using high signal variable
-encode_dti <- function(x, dti) {
-  # Scale DTI
-  dti_scaled <- round(dti*1000)
-
-  # Create Features
-  feature_dti <- x*10000 + dti_scaled
-
-  # Return output
-  return(feature_dti)
-
-}
-
-encode_wf <- function(x, wf) {
-  # Create Feature
-  feature_wf <- x*10 + wf
-
-  # Return output
-  return(feature_wf)
-
-}
-
-encode_dti_wf <- function(x, dti, wf) {
-  # Scale DTI
-  dti_scaled <- round(dti*1000)
-
-  # Create Features
-  feature_dti_wf <- x*10000 + wf*1000 + dti_scaled
-
-  # Return output
-  return(feature_dti_wf)
-
-}
-
-# Perform categorical encoding using DTI and working flag
-full_tree_wf_grade <- full %>% mutate_if(sapply(full, is.character), as.factor)
-
-full_tree_encoded <- full_tree_wf_grade %>% mutate(
-                      across(
-                        where(is.factor),
-                        ~ encode_dti(as.integer(.x), debt_to_income_ratio),
-                        .names = "{.col}_dti_encoded"
-                        )
-                        ) %>%
-                        mutate(
-                          across(
-                        where(is.factor),
-                        ~ encode_wf(as.integer(.x), working_flag),
-                        .names = "{.col}_wf_encoded"
-                        )
-                        ) %>%
-                        mutate(
-                          across(
-                        where(is.factor),
-                        ~ encode_dti_wf(as.integer(.x), debt_to_income_ratio, working_flag),
-                        .names = "{.col}_dti_wf_encoded"
-                        )
-                        )
-                    
-
-# Save dataset after encoding of factor variables in form of train and test datasets
-train_tree_encoded <- full_tree_encoded %>% filter(!is.na(loan_paid_back))
-test_tree_encoded <- full_tree_encoded %>% filter(is.na(loan_paid_back)) %>% select(-loan_paid_back)
-
-save(train_tree_encoded, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_tree_encoded.Rdata")
-
-save(test_tree_encoded, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_tree_encoded.Rdata")
-```
-
-
-Now, we will estimate aggregate statistics of numerical variables by categorical variables. In Chris' notebook, this was achieved by **RAPIDs** library. We will see if it can be replicated in R using dplyr.
-
-```{r agg_stats_vars}
-# Declare aggregate stats functions for real numeric variables
-STAT_FNS <- list(
-  mean   = mean,
-  sd     = sd,
-  median = median
-)
-
-# Declare categorical features
-cat_vars <- names(which(sapply(train_tree, is.factor)))
-num_vars <- names(which(sapply(train_tree, is.numeric)))[c(-1,-7)]
-combo_vars <- setdiff(colnames(train_tree_encoded), union(cat_vars, num_vars))[c(-1,-2)]
-
-# Create function to compute aggregate statistics
-compute_aggregates <- function(data, cat_vars, num_vars, fn_list) {
-  
-  for (g in cat_vars) {
-    for (v in num_vars) {
-      
-      message("Aggregating: ", g, " → ", v)
-      prefix <- substr(g, 1, 3)
-      agg <- data %>%
-        group_by(.data[[g]]) %>%
-        summarise(
-          across(
-            all_of(v),
-            fn_list,
-            .names = paste0("{.col}_", prefix, "_{.fn}")
-          ),
-          .groups = "drop"
-        )
-      
-      # merge into df_all
-      data <- data %>%
-        left_join(agg, by = g)
-    }
-  }
-  
-  return(data)
-}
-
-# Compute aggregate statistics for real numeric variables
-full_tree_agg <- full_tree_encoded %>%
-                  compute_aggregates(cat_vars = cat_vars,
-                  num_vars = num_vars,
-                  fn_list  = STAT_FNS)
-
-# Split and save into train and test datasets
-train_tree_agg <- full_tree_agg %>% filter(!is.na(loan_paid_back))
-test_tree_agg <- full_tree_agg %>% filter(is.na(loan_paid_back)) %>% select(-loan_paid_back)
-
-save(train_tree_agg, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_tree_agg.Rdata")
-
-save(test_tree_agg, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_tree_agg.Rdata")
-```
