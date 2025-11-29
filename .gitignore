@@ -21,6 +21,8 @@ data/processed/*
 # === Ignore outputs ===
 outputs
 
+# === Ignore step functions ===
+step_functions
 
 /.quarto/
 **/*.quarto_ipynb

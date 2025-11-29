@@ -35,6 +35,7 @@ library(car) # VIF
 library(glmnet) # LASSO
 library(janitor) # Cleaning names
 library(caret) # Create Folds
+library(future)
 ```
 
 ```{r setup}
@@ -44,6 +45,7 @@ set.seed(123)
 # Load Data
 train <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/train.csv")
 test <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/test.csv")
+orig <-fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/raw/loan_dataset_20000.csv")
 ```
 
 
@@ -454,7 +456,7 @@ We will try to engineer our existing variables to increase our feature space so 
 
 As we have seen in our EDA, there are two variables - **DTI** and **Employment Status** with very high IV. This indicates that this data is synthetically created and we can leverage these two variables to improve our model performance.  
 
-In line with the guidance from Chris's notebook, we will be performing feature engineering within the nested folds of our cross-validation based model training workflow. Therefore, we will be doing it in our **Model Development** notebook.
+In line with the guidance from Chris's notebook, we will be performing target encoding within the nested folds of our cross-validation based model training workflow. Therefore, we will be doing it in our **Model Development** notebook.
 
 Before going to it, I will combine tree and test datasets and convert all character variables to factor and remove the derived variables - **Grade** and **Working Flag**.
 
@@ -470,9 +472,137 @@ full_tree <- full %>%
 # Save Base dataset with raw variables in form of train and test datasets
 train_tree <- full_tree %>% filter(!is.na(loan_paid_back))
 test_tree <- full_tree %>% filter(is.na(loan_paid_back)) %>% select(-loan_paid_back)
-
-save(train_tree, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_tree.Rdata")
-
-save(test_tree, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_tree.Rdata")
 ```
 
+In this section, we will apply following three functions that I have created to derive new variables:
+
+- **Binning of numeric variables**: Quantile for skewed continuous variables and fixed binning for normally distributed continuous variables
+- **Interaction variables**: Interaction between key numeric and factor variables
+- **Aggregated encoding**: Encoding of all variables in original dataset using aggregate statistics like mean and count 
+
+```{r adv_fe}
+start_time <- Sys.time()
+# Load functions 
+source("/workspace/Projects/kaggle-credit-risk-s5e11/helpR_funcs/fe_bigrams.R")
+source("/workspace/Projects/kaggle-credit-risk-s5e11/helpR_funcs/fe_round.R")
+source("/workspace/Projects/kaggle-credit-risk-s5e11/helpR_funcs/fe_orig.R")
+
+# Set data tables
+dt_train <- setDT(train_tree)
+dt_test <- setDT(test_tree)
+
+# Define target variable 
+target <- "loan_paid_back"
+
+# Define id variable
+id <- "id"
+
+# Define non-features
+non_features <- list(id, target)
+
+# Define features
+features <- names(dt_train[, .SD, .SDcols = setdiff(names(dt_train), non_features)])
+numeric <- names(dt_train[, .SD, .SDcols = is.numeric])
+factors <- names(dt_train[,.SD, .SDcols = setdiff(names(dt_train), union(numeric, target))])
+
+# Create list of data tables
+dt_list = list(dt_train, dt_test)
+
+# Apply bigram function to both train and test 
+bigram_features <- setdiff(features, c("annual_income", "loan_amount"))
+fe_bigrams(dt_list, cols = bigram_features)
+
+# Apply round function to both train and test 
+round_features <- c("annual_income", "loan_amount")
+fe_round(dt_list, cols = round_features)
+
+# Apply aggregated encoding using orignial dataset to both train and test
+# assume train_dt, test_dt, orig_dt exist in workspace
+final_fe <- fe_orig(orig,dt_list,features,target)
+
+# Assign them 
+train_fe <- final_fe[[1]]
+test_fe <- final_fe[[2]]
+
+# Save datasets
+save(train_fe, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_fe.Rdata")
+
+save(test_fe, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_fe.Rdata")
+```
+
+```{r comp}
+
+
+# Compare tables
+inter <- colnames(train_fe %>% dplyr::select(starts_with("inter_")))
+round <- colnames(train_fe %>% dplyr::select(starts_with("round_")))
+orign <- colnames(train_fe %>% dplyr::select(starts_with("orig_")))
+
+
+
+kaggle <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_preproc_v3.csv")
+str(kaggle)
+identical(dt_train, kaggle)
+
+#INTER
+DT1 <- kaggle[,.SD, .SDcols = inter]
+DT2 <- train_fe[,.SD, .SDcols = inter]
+
+compare_cols <- data.table::data.table(
+  column = names(DT1),
+  class_DT1 = sapply(DT1, class),
+  class_DT2 = sapply(DT2, class),
+  same_class = sapply(DT1, class) == sapply(DT2, class),
+  identical_col = sapply(names(DT1), function(col) all.equal(DT1[[col]], DT2[[col]])),
+  unique_DT1 = sapply(DT1, function(x) length(unique(x))),
+  unique_DT2 = sapply(DT2, function(x) length(unique(x)))
+)
+
+compare_cols
+
+# Find mismatch
+find_mismatches <- function(DT1, DT2, col) {
+  idx <- DT1[[col]] != DT2[[col]] | (is.na(DT1[[col]]) != is.na(DT2[[col]]))
+  mism <- data.table::data.table(
+    row = which(idx),
+    DT1_value = DT1[[col]][idx],
+    DT2_value = DT2[[col]][idx]
+  )
+  return(mism)
+}
+
+mism <- find_mismatches(DT1, DT2, "inter_interest_rate_gender")
+head(mism, 20)
+nrow(mism)
+
+
+# ORIG
+DT1 <- kaggle[,.SD, .SDcols = orign]
+DT2 <- train_fe[,.SD, .SDcols = orign]
+
+compare_cols <- data.table::data.table(
+  column = names(DT1),
+  class_DT1 = sapply(DT1, class),
+  class_DT2 = sapply(DT2, class),
+  same_class = sapply(DT1, class) == sapply(DT2, class),
+  identical_col = sapply(names(DT1), function(col) all.equal(DT1[[col]], DT2[[col]])),
+  unique_DT1 = sapply(DT1, function(x) length(unique(x))),
+  unique_DT2 = sapply(DT2, function(x) length(unique(x)))
+)
+
+compare_cols
+
+# ROUND
+DT1 <- kaggle[,.SD, .SDcols = round]
+DT2 <- train_fe[,.SD, .SDcols = round]
+
+compare_cols <- data.table::data.table(
+  column = names(DT1),
+  class_DT1 = sapply(DT1, class),
+  class_DT2 = sapply(DT2, class),
+  same_class = sapply(DT1, class) == sapply(DT2, class),
+  identical_col = sapply(names(DT1), function(col) all.equal(DT1[[col]], DT2[[col]])),
+  unique_DT1 = sapply(DT1, function(x) length(unique(x))),
+  unique_DT2 = sapply(DT2, function(x) length(unique(x)))
+)
+```
