@@ -268,22 +268,13 @@ ensemble_fold_cv_model <- function(
       dval   <- xgb.DMatrix(data = X_val, label = y_val)
       dtest  <- xgb.DMatrix(data = X_tst)
 
-      # ------------------------------------------------------
-      # XGBoost parameter fix
-      # ------------------------------------------------------
-      params_clean <- xgb_params
-
-      # Remove forbidden params
-      forbidden <- c("nrounds", "niter")
-      params_clean <- params_clean[!names(params_clean) %in% forbidden]
-
-      # extract nrounds separately
-      nrounds_local <- xgb_params$nrounds %||% xgb_params$niter %||% 200
+      # Make it set from function call later on
+      nrounds_local <- 10000
 
       log("Training XGBoost with nrounds =", nrounds_local)
 
       model <- xgboost::xgb.train(
-        params = params_clean,    # cleaned params (GPU params go here)
+        params = xgb_params,    # cleaned params (GPU params go here)
         data = dtrain,
         nrounds = nrounds_local,  # ONLY here
         watchlist = list(train = dtrain, eval = dval),
@@ -307,7 +298,9 @@ ensemble_fold_cv_model <- function(
         val_idx = val_idx,
         val_pred = val_pred,
         test_pred = test_pred,
-        fold_auc = fold_auc
+        fold_auc = fold_auc,
+        X_val = X_val,       
+        y_val = y_val      
       ))
 
     }, error = function(e) {
@@ -321,6 +314,7 @@ ensemble_fold_cv_model <- function(
   # ------------------------------------------------------
   if (parallel) {
     results <- future.apply::future_lapply(seq_len(folds), run_fold, future.seed = TRUE)
+    
   } else {
     results <- lapply(seq_len(folds), run_fold)
   }
@@ -341,10 +335,26 @@ ensemble_fold_cv_model <- function(
 
   future::plan("sequential")
 
+  # --------------------------------------------
+  # Rebuild full transformed training dataset
+  # --------------------------------------------
+  X_full <- matrix(NA_real_, nrow(train_dt), ncol(results[[1]]$X_val))
+  y_full <- numeric(nrow(train_dt))
+
+  colnames(X_full) <- colnames(results[[1]]$X_val)
+
+  for (res in results) {
+    X_full[res$val_idx, ] <- res$X_val
+    y_full[res$val_idx] <- res$y_val
+  }
+
+  
   return(list(
     oof_auc = final_auc,
     oof_preds = oof_preds,
     test_preds = test_preds_sum,
-    fold_aucs = fold_aucs
+    fold_aucs = fold_aucs,
+    X_full = X_full,
+    y_full = y_full
   ))
 }

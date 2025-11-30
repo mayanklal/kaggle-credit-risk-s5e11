@@ -40,7 +40,6 @@ library(lmtest) # Joint Wald Test
 library(Matrix) # Create Matrix objects for XGBoost
 library(xgboost) # XGBoost
 library(caret) # Stratified Splitting
-#library(SHAPforxgboost) # Interpretability
 
 # Tidy Modeling
 library(tidymodels)
@@ -50,6 +49,7 @@ library(rlang)
 library(vip)
 library(future)
 library(future.apply)
+library(fastshap)
 ```
 
 This is a rough sketch notebook. We will furnish it before publishing.
@@ -437,8 +437,7 @@ xgb_params <- list(
   device = "cuda",
   
   # === System settings ===
-  nthread = parallel::detectCores(),
-  nrounds = 10000
+  nthread = parallel::detectCores()
 )
 
 # Perform Ensemble Fold CV Model Run 
@@ -465,123 +464,160 @@ res <- ensemble_fold_cv_model(
 
 # Extract submissions
 submission_xgb_iter03 <- data.frame(
-  id = test_tree$id,
-  loan_paid_back = test_pred$.pred_1
+  id = dt_test$id,
+  loan_paid_back = res$test_preds
 )
 
 # Save to csv
-write.csv(submission_xgb_iter03, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_xgb_iter02.csv", row.names = FALSE)
+write.csv(submission_xgb_iter03, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_xgb_iter03.csv", row.names = FALSE)
 ```
 
-```{r validation_te}
-N <- nrow(dt_train)
-split_idx <- floor(0.8 * N)
 
-dt_train_v <- dt_train[1:split_idx]
-dt_valid_v <- dt_train[(split_idx+1):N]
+### XGBoost - Folds ensembled based Modeling using Target Encoding (Iteration 4)
 
-y_train_v <- dt_train_v[[target]]
-y_valid_v <- dt_valid_v[[target]]
+In this iteration, we will apply pruning of tree to remove unwanted features using SHAP and retrain our model.
 
-dt_train_te <- te_fit_transform(
-  dt_train_v,
-  cols = inter,
-  target = target,
-  aggs = "mean",
-  smooth = 1,
-  debug = TRUE,
-  drop_original = TRUE
+```{r shap_pruning}
+# Build fully transformed train dataset from previous iteration
+dtrain_full <- xgb.DMatrix(data = res$X_full, label = res$y_full)
+
+# Train Full Model before pruning
+xgb_pre_prune_model <- xgb.train(
+  params = xgb_params,
+  data = dtrain_full,
+  nrounds = 1500
 )
 
-te_obj <- te_fit(
-  dt_train_v,
-  cols = inter,
-  target = target,
-  aggs = "mean",
-  smooth = 1,
-  debug = TRUE
+# Compute XGB Importance
+importance_matrix <- xgb.importance(
+  model = xgb_pre_prune_model,
+  feature_names = colnames(dtrain_full)
 )
 
-dt_valid_te <- te_transform(
-  te_obj,
-  dt_valid_v,
-  drop_original = TRUE,
-  in_place = FALSE,
-  debug = TRUE
+xgb.plot.importance(importance_matrix[1:20,])
+
+# Store Gain scores
+gain_scores <- setNames(importance_matrix$Gain, importance_matrix$Feature)
+
+gain_importance <- data.table(
+  Feature = names(gain_scores),
+  Gain = as.numeric(gain_scores)
 )
 
-# Compare
+# Construct VIP using "exact" SHAP values from XGBoost's internal Tree SHAP
+# functionality
 
+vip(
+  xgb_pre_prune_model,
+  method = "shap",
+  train = res$X_full,
+  exact = TRUE,
+  num_features = 20,
+  include_type = TRUE,
+  geom = "point",
+  horizontal = TRUE
+) + theme_light()
 
-x_te_k <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/X_train_te.csv")
-v_te_k <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/X_valid_te.csv")
-
-x_te_r <- dt_train_te[[1]]
-
-#INTER
-te_inter <- colnames(x_te_r %>% dplyr::select(starts_with("TE_inter_")))
-DT1 <- x_te_k[,.SD, .SDcols = te_inter]
-DT2 <- x_te_r[,.SD, .SDcols = te_inter]
-
-compare_cols <- data.table::data.table(
-  column = names(DT1),
-  class_DT1 = sapply(DT1, class),
-  class_DT2 = sapply(DT2, class),
-  same_class = sapply(DT1, class) == sapply(DT2, class),
-  identical_col = sapply(names(DT1), function(col) all.equal(DT1[[col]], DT2[[col]])),
-  unique_DT1 = sapply(DT1, function(x) length(unique(x))),
-  unique_DT2 = sapply(DT2, function(x) length(unique(x)))
+vip_shap_tbl <- vip::vi(
+  object = xgb_pre_prune_model,
+  method = "shap",
+  train = res$X_full,
+  exact = TRUE
 )
 
-compare_cols
+shap_importance <- data.table(
+  Feature = vip_shap_tbl$Variable,
+  SHAP    = vip_shap_tbl$Importance
+)
 
-# Find mismatch
-find_mismatches <- function(DT1, DT2, col) {
-  idx <- DT1[[col]] != DT2[[col]] | (is.na(DT1[[col]]) != is.na(DT2[[col]]))
-  mism <- data.table::data.table(
-    row = which(idx),
-    DT1_value = DT1[[col]][idx],
-    DT2_value = DT2[[col]][idx]
-  )
-  return(mism)
-}
+# Combine Gain and SHAP into importance table 
+importance <- merge(
+  shap_importance,
+  gain_importance,
+  by = "Feature",
+  all = TRUE
+)
 
-mism <- find_mismatches(DT1, DT2, "TE_inter_interest_rate_gender_mean")
-head(mism, 20)
-nrow(mism)
+# Replace NA with 0
+importance[is.na(importance)] <- 0
+
+importance[, Combined := 0.6*Gain + 0.4*SHAP]
+importance <- importance[order(-Combined)]
+
+# Select features to drop
+importance_pruned <- importance[Combined >= 0.01]
+keep_features <- importance_pruned$Feature
+drop_features <- importance[Combined < 0.01]$Feature
+
+# Clean feature names
+clean_names <- gsub("^TE_", "", keep_features)
+clean_features <- gsub("_mean$", "", clean_names)
 ```
 
-```{r te_check1}
-fold_ids_r <- kfold_ids(nrow(dt_train), v=5, seed=42)
-fold_ids_py <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/py_folds.csv")
-mean(py$V1 == r$V1)    # % match
 
-```
+```{r xgb_cv_iter04}
+# Clean datasets 
+dt_train_clean <- dt_train[, .SD, .SDcols = union(clean_features, target)]
+dt_test_clean <- dt_test[, .SD, .SDcols = clean_features]
 
-```{r kfold}
-kfold_ids_sklearn <- function(n, v = 5, seed = 42) {
-  set.seed(seed)
-  
-  # Step 1 — shuffle like sklearn
-  idx <- sample.int(n) - 1   # create 0-based shuffled indices
-  
-  # Step 2 — calculate fold sizes like sklearn
-  fold_sizes <- rep(floor(n / v), v)
-  remainder <- n %% v
-  fold_sizes[1:remainder] <- fold_sizes[1:remainder] + 1
-  
-  # Step 3 — assign folds
-  fold_id <- integer(n)
-  start <- 1
-  
-  for (i in seq_len(v)) {
-    end <- start + fold_sizes[i] - 1
-    fold_id[idx[start:end] + 1] <- i - 1  # assign fold # (0..v-1)
-    start <- end + 1
-  }
-  
-  return(fold_id)
-}
+# Categorise features
+features <- clean_features
+numeric <- names(dt_train_clean[, .SD, .SDcols = setdiff(names(dt_train_clean[,.SD,.SDcol = is.numeric]), non_features)])
+factors <- names(dt_train_clean[,.SD, .SDcols = setdiff(names(dt_train_clean), union(numeric, union(target, non_features)))])
+inter <- colnames(dt_train_clean %>% dplyr::select(starts_with("inter_")))
+round <- colnames(dt_train_clean %>% dplyr::select(starts_with("round_")))
 
-fold_r <- kfold_ids_sklearn(nrow(dt_train), v=5, seed=42)
+# Specify XGBoost Params
+xgb_params <- list(
+  booster = "gbtree",
+  
+  # === Objective ===
+  objective = "binary:logistic",
+  eval_metric = "auc",
+  
+  # === Main hyperparameters ===
+  eta = 0.01,               # learn_rate
+  max_depth = 6,            # tree_depth
+  subsample = 0.55,         # sample_size
+  colsample_bytree = 0.3,   # mtry equivalent
+  gamma = 0,                # loss_reduction
+  
+  # === GPU (CUDA) settings ===
+  device = "cuda",
+  
+  # === System settings ===
+  nthread = parallel::detectCores(),
+  nrounds = 10000
+)
+
+# Perform Ensemble Fold CV Model Run 
+res_v4 <- ensemble_fold_cv_model(
+  train_dt = dt_train_clean,
+  test_dt  = dt_test_clean,
+  target   = target,
+
+  INTER = inter,
+  ROUND = round,
+  CATS  = factors,
+
+  xgb_params = xgb_params,
+  folds = 5,
+  te_cv = 5,
+  te_smooth = 1.0,
+  drop_original_te1 = TRUE,
+  drop_original_te2 = FALSE,
+
+  parallel = FALSE,
+  seed = 2025,
+  verbose = TRUE
+)
+
+# Extract submissions
+submission_xgb_iter04 <- data.frame(
+  id = dt_test$id,
+  loan_paid_back = res_v4$test_preds
+)
+
+# Save to csv
+write.csv(submission_xgb_iter04, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_xgb_iter04.csv", row.names = FALSE)
 ```
