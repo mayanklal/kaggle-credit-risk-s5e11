@@ -29,3 +29,4 @@ step_functions
 
 # === Ignore models ===
 models
+models/*
