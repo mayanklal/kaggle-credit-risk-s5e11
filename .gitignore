@@ -26,3 +26,6 @@ step_functions
 
 /.quarto/
 **/*.quarto_ipynb
+
+# === Ignore models ===
+models
