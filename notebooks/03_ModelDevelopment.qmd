@@ -40,6 +40,7 @@ library(lmtest) # Joint Wald Test
 library(Matrix) # Create Matrix objects for XGBoost
 library(xgboost) # XGBoost
 library(caret) # Stratified Splitting
+library(lightgbm) # LightGBM
 
 # Tidy Modeling
 library(tidymodels)
@@ -473,7 +474,7 @@ write.csv(submission_xgb_iter03, "/workspace/Projects/kaggle-credit-risk-s5e11/o
 ```
 
 
-### XGBoost - Folds ensembled based Modeling using Target Encoding (Iteration 4)
+### XGBoost - Folds ensembled based Modeling using Target Encoding after pruning based on Gain and SHAP (Iteration 4)
 
 In this iteration, we will apply pruning of tree to remove unwanted features using SHAP and retrain our model.
 
@@ -586,8 +587,7 @@ xgb_params <- list(
   device = "cuda",
   
   # === System settings ===
-  nthread = parallel::detectCores(),
-  nrounds = 10000
+  nthread = parallel::detectCores()
 )
 
 # Perform Ensemble Fold CV Model Run 
@@ -620,4 +620,288 @@ submission_xgb_iter04 <- data.frame(
 
 # Save to csv
 write.csv(submission_xgb_iter04, "/workspace/Projects/kaggle-credit-risk-s5e11/outputs/submission_xgb_iter04.csv", row.names = FALSE)
+
+# Create full dataset
+dtrain_full <- xgb.DMatrix(data = res$X_full, label = res$y_full)
+
+# Train final XGBoost Model
+final_xgb_model <- xgb.train(
+  params = xgb_params,
+  data = dtrain_full,
+  nrounds =  1800, # or manual
+  verbose = 1
+)
+
+# Save model
+xgb.save(final_xgb_model, "models/xgb/xgb_final.json")
+saveRDS(colnames(res$X_full), "models/xgb/xgb_feature_list_full.rds")
+write.csv(res_v4$oof_preds, "models/xgb/OOF_xgb.csv", row.names = FALSE)
+```
+
+### LightGBM - Base Model with all features and more features based on quantile binning, high signal encoding and numeric interactions (Iteration 1)
+
+
+```{r lgbm_iter01}
+# Load datasets
+load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_fe_v2.Rdata")
+load(file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_fe_v2.Rdata")
+
+dt_train_lgbm <- setDT(train_fe_v2)
+dt_test_lgbm <- setDT(test_fe_v2)
+
+# Load target encoding function
+source("/workspace/Projects/kaggle-credit-risk-s5e11/helpR_funcs/fe_target_encoder.R")
+
+# Load logistic regression encoding function
+source("/workspace/Projects/kaggle-credit-risk-s5e11/helpR_funcs/logistic_regression_encode.R")
+
+# Load ensemble fold cv model function
+source("/workspace/Projects/kaggle-credit-risk-s5e11/helpR_funcs/ensemble_fold_cv_lgb.R")
+
+# Define target variable 
+target <- "loan_paid_back"
+
+# Define id variable
+id <- "id"
+
+# Define non-features
+non_features <- list(id, target)
+
+# Remove ID column
+dt_train_lgbm <- dt_train_lgbm[,.SD,.SDcols = -id]
+dt_test_lgbm <- dt_test_lgbm[,.SD,.SDcols = -id]
+
+# Full feature list
+#full_features <- colnames(dt_train_lgbm)
+
+# XGB Model features
+#xgb_features <- clean_features
+
+# Categorise features
+factors_raw <- c("grade", "subgrade", "employment_status", "education_level", "loan_purpose", "education_level", "marital_status", "gender")
+numeric <- names(dt_train_lgbm[, .SD, .SDcols = setdiff(names(dt_train_lgbm[,.SD,.SDcol = is.numeric]), non_features)])
+inter <- colnames(dt_train_lgbm %>% dplyr::select(starts_with("inter_")))
+round <- colnames(dt_train_lgbm %>% dplyr::select(starts_with("round_")))
+
+# Specify LightGBM Params
+lgb_params <- list(
+  objective          = "binary",
+  metric             = "auc",
+  boosting_type      = "gbdt",
+  
+  learning_rate      = 0.01,
+  num_leaves         = 31,
+  max_depth          = -1,
+  
+  # Auto-pruning controls
+  min_data_in_leaf   = 50,
+  min_gain_to_split  = 0.01,
+  reg_alpha          = 0.2,
+  reg_lambda         = 0.5,
+  
+  # Sampling-based auto-pruning
+  colsample_bytree   = 0.6,
+  colsample_bynode   = 0.6,
+  subsample          = 0.7,
+  subsample_freq     = 1,
+  
+  # Speed / reproducibility
+  num_threads        = parallel::detectCores(),
+  device             = "gpu",
+  verbose            = 1,
+  seed               = 42
+)
+
+
+# ================================
+# Perform Ensemble Fold CV Model Run (LightGBM)
+# ================================
+
+# Let's drop inter variables and then run it
+
+res_lgb <- ensemble_fold_cv_lgb(
+  train_dt = dt_train_lgbm,
+  test_dt  = dt_test_lgbm,
+  target   = target,
+
+  # --- Feature groups ---
+  RAW_CATS = factors_raw,     # raw categorical vars for LR embeddings
+  INTER    = inter,           # inter_* for TE (if enabled)
+  ROUND    = round,           # round_* for TE (if enabled)
+  enable_te = TRUE,           # switch TE on/off for testing performance impact
+
+  # --- LightGBM parameters (your tuned list) ---
+  lgb_params = lgb_params,    # <--- the param list you prepared earlier
+
+  # --- CV settings ---
+  folds = 5,
+  te_cv = 5,
+  te_smooth = "auto",
+  lambda_lr = 1e-6,           # LR embedding ridge penalty
+  drop_original_te1 = TRUE,
+  drop_original_te2 = FALSE,
+
+  # --- Runtime ---
+  parallel = FALSE,           # or TRUE if needed
+  seed = 2025,
+  verbose = TRUE,
+
+  # --- Training loop ---
+  nrounds_local = 10000,       # booster rounds (equivalent to num_boost_round)
+  early_stopping_rounds = 100, # stop like Python's early_stopping(100)
+
+  # --- Debug / Model Saving (optional) ---
+  debug = TRUE,
+  snapshot_dir = "models/lgbm",
+  model_dir = "models/lgbm"     # saves each fold model
+)
+
+# Build fully transformed train dataset from previous iteration
+dtrain <- lightgbm::lgb.Dataset(data = res_lgb$X_full, label = res_lgb$y_full)
+dval <- lightgbm::lgb.Dataset(data = res_lgb$X_full, label = res_lgb$y_full, reference = dtrain)
+
+# Train Full Model before pruning
+lgb_pre_prune_model <- suppressWarnings(
+                        lightgbm::lgb.train(
+                          params = lgb_params,
+                          data = dtrain,
+                          nrounds = 1216,
+                          verbose = 1L
+                        )
+                      )
+
+# -----------------------------------------------------------
+# 1. LightGBM GAIN Importance
+# -----------------------------------------------------------
+
+lgb_imp <- lightgbm::lgb.importance(lgb_pre_prune_model, percentage = TRUE)
+
+gain_importance <- data.table(
+  Feature = lgb_imp$Feature,
+  Gain = as.numeric(lgb_imp$Gain)
+)
+
+# -----------------------------------------------------------
+# 2. SHAP Importance via vip::vi()
+#    vip supports LightGBM models directly.
+# -----------------------------------------------------------
+
+vip_shap_tbl <- vip::vi(
+  object = lgb_pre_prune_model,
+  method = "shap",
+  train  = res_lgb$X_full,
+  exact  = TRUE,
+  feature_names = colnames(res_lgb$X_full)
+)
+
+shap_importance <- data.table(
+  Feature = vip_shap_tbl$Variable,
+  SHAP    = vip_shap_tbl$Importance
+)
+
+# -----------------------------------------------------------
+# 3. Merge SHAP + Gain
+# -----------------------------------------------------------
+
+importance <- merge(
+  shap_importance,
+  gain_importance,
+  by = "Feature",
+  all = TRUE
+)
+
+importance[is.na(importance)] <- 0
+
+# Weighted combined importance (same as your XGB logic)
+importance[, Combined := 0.6 * Gain + 0.4 * SHAP]
+
+importance <- importance[order(-Combined)]
+
+# -----------------------------------------------------------
+# 4. Threshold for pruning
+# -----------------------------------------------------------
+
+threshold <- 0.01  # tweak if needed
+
+importance_pruned <- importance[Combined >= threshold]
+
+keep_features <- importance_pruned$Feature
+drop_features <- importance[Combined < threshold]$Feature
+
+# -----------------------------------------------------------
+# 5. Output Summary
+# -----------------------------------------------------------
+
+cat("Total features:", nrow(importance), "\n")
+cat("Keeping:", length(keep_features), "\n")
+cat("Dropping:", length(drop_features), "\n")
+
+head(importance)
+```
+
+```{r lgbm_iter_02}
+# Clean feature names
+# Identify only TE_ columns
+te_cols <- grep("^TE_", keep_features, value = TRUE)
+te_cols_cleaned_v1 <- gsub("^TE_", "", te_cols)
+te_cols_cleaned <- gsub("_mean$", "", te_cols_cleaned_v1)
+cols_not_te <- setdiff(keep_features, te_cols)
+cols_not_te_clened <- gsub("^lr_cat_", "", cols_not_te)
+
+clean_features <- union(te_cols_cleaned, cols_not_te_clened)
+
+# Clean datasets 
+dt_train_lgbm_clean <- dt_train_lgbm[, .SD, .SDcols = union(clean_features, target)]
+dt_test_lgbm_clean <- dt_train_lgbm[, .SD, .SDcols = clean_features]
+
+# Categorise features
+factors_raw <- "employment_status"
+numeric <- names(dt_train_lgbm_clean[, .SD, .SDcols = setdiff(names(dt_train_lgbm_clean[,.SD,.SDcol = is.numeric]), non_features)])
+inter <- colnames(dt_train_lgbm_clean %>% dplyr::select(starts_with("inter_")))
+round <- colnames(dt_train_lgbm_clean %>% dplyr::select(starts_with("round_")))
+
+
+# ================================
+# Perform Ensemble Fold CV Model Run (LightGBM)
+# ================================
+
+# Let's drop inter variables and then run it
+
+res_lgb_v2 <- ensemble_fold_cv_lgb(
+  train_dt = dt_train_lgbm_clean,
+  test_dt  = dt_test_lgbm_clean,
+  target   = target,
+
+  # --- Feature groups ---
+  RAW_CATS = factors_raw,     # raw categorical vars for LR embeddings
+  INTER    = inter,           # inter_* for TE (if enabled)
+  ROUND    = round,           # round_* for TE (if enabled)
+  enable_te = TRUE,           # switch TE on/off for testing performance impact
+
+  # --- LightGBM parameters (your tuned list) ---
+  lgb_params = lgb_params,    # <--- the param list you prepared earlier
+
+  # --- CV settings ---
+  folds = 5,
+  te_cv = 5,
+  te_smooth = "auto",
+  lambda_lr = 1e-6,           # LR embedding ridge penalty
+  drop_original_te1 = TRUE,
+  drop_original_te2 = FALSE,
+
+  # --- Runtime ---
+  parallel = FALSE,           # or TRUE if needed
+  seed = 2025,
+  verbose = TRUE,
+
+  # --- Training loop ---
+  nrounds_local = 10000,       # booster rounds (equivalent to num_boost_round)
+  early_stopping_rounds = 100, # stop like Python's early_stopping(100)
+
+  # --- Debug / Model Saving (optional) ---
+  debug = TRUE,
+  snapshot_dir = "models/lgbm",
+  model_dir = "models/lgbm"     # saves each fold model
+)
+
 ```

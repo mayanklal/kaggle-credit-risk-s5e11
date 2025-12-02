@@ -1,0 +1,40 @@
+2025-12-01 01:35:32.655529 | [start] rows train= 593994  test= 593994  folds= 5
+2025-12-01 01:35:32.981699 | [precompute] fitting TE (INTER) on full train for test transform
+2025-12-01 01:35:38.038929 | [precompute] fitting TE (ROUND) on full train for test transform
+2025-12-01 01:35:42.287587 | [precompute] fitting LR encoder on full train for test transform
+2025-12-01 01:35:43.676736 | === fold 1 start ===
+2025-12-01 01:35:44.190503 | [fold] TE stage INTER
+2025-12-01 01:36:24.621084 | [fold] TE stage ROUND
+2025-12-01 01:36:43.896012 | [fold] LR embedding stage
+2025-12-01 01:36:51.718914 | [fold] training LightGBM fold 1
+2025-12-01 01:44:28.37039 | [fold] Fold 1 AUC: 0.926238
+2025-12-01 01:44:28.39424 | [fold] saved model -> models/lgbm/lgb_fold01.txt
+2025-12-01 01:44:42.868885 | === fold 2 start ===
+2025-12-01 01:44:43.061253 | [fold] TE stage INTER
+2025-12-01 01:45:10.14532 | [fold] TE stage ROUND
+2025-12-01 01:45:24.12127 | [fold] LR embedding stage
+2025-12-01 01:45:28.270219 | [fold] training LightGBM fold 2
+2025-12-01 01:47:59.345348 | [fold] Fold 2 AUC: 0.927294
+2025-12-01 01:47:59.373602 | [fold] saved model -> models/lgbm/lgb_fold02.txt
+2025-12-01 01:48:14.100549 | === fold 3 start ===
+2025-12-01 01:48:14.336835 | [fold] TE stage INTER
+2025-12-01 01:48:40.697796 | [fold] TE stage ROUND
+2025-12-01 01:48:55.612478 | [fold] LR embedding stage
+2025-12-01 01:48:59.653232 | [fold] training LightGBM fold 3
+2025-12-01 01:51:19.29462 | [fold] Fold 3 AUC: 0.926978
+2025-12-01 01:51:19.32218 | [fold] saved model -> models/lgbm/lgb_fold03.txt
+2025-12-01 01:51:33.83296 | === fold 4 start ===
+2025-12-01 01:51:34.018992 | [fold] TE stage INTER
+2025-12-01 01:52:00.439574 | [fold] TE stage ROUND
+2025-12-01 01:52:14.504539 | [fold] LR embedding stage
+2025-12-01 01:52:30.195338 | [fold] training LightGBM fold 4
+2025-12-01 01:54:30.175709 | [fold] Fold 4 AUC: 0.926975
+2025-12-01 01:54:30.20052 | [fold] saved model -> models/lgbm/lgb_fold04.txt
+2025-12-01 01:54:44.434363 | === fold 5 start ===
+2025-12-01 01:54:46.048977 | [fold] TE stage INTER
+2025-12-01 01:55:12.67683 | [fold] TE stage ROUND
+2025-12-01 01:55:26.011492 | [fold] LR embedding stage
+2025-12-01 01:55:30.011255 | [fold] training LightGBM fold 5
+2025-12-01 01:57:56.231095 | [fold] Fold 5 AUC: 0.926874
+2025-12-01 01:57:56.26102 | [fold] saved model -> models/lgbm/lgb_fold05.txt
+2025-12-01 01:58:12.797669 | [final] OOF AUC = 0.926861

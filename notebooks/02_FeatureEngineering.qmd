@@ -198,12 +198,12 @@ From the above charts, we can see that we are able to maintain monotonic relatio
 
 ```{r hc, include = TRUE}
 # Filter variables based on IV statistic and Business Intuition
-train_corr <- train %>% select(-employment_status, 
+train_corr <- train %>% dplyr::select(-employment_status, 
                                -grade_subgrade,
                                -gender,
                                -marital_status)
 
-test_corr <- test %>% select(-employment_status, 
+test_corr <- test %>% dplyr::select(-employment_status, 
                                -grade_subgrade,
                                -gender,
                                -marital_status)
@@ -467,16 +467,16 @@ full <- rbind(train, test, fill = TRUE)
 # Convert Categorical Variable to Factor Variables
 full_tree <- full %>%
                   mutate_if(sapply(full, is.character), as.factor) %>%
-                  select(-grade, -working_flag)
+                  dplyr::select(-grade, -working_flag)
 
 # Save Base dataset with raw variables in form of train and test datasets
 train_tree <- full_tree %>% filter(!is.na(loan_paid_back))
-test_tree <- full_tree %>% filter(is.na(loan_paid_back)) %>% select(-loan_paid_back)
+test_tree <- full_tree %>% filter(is.na(loan_paid_back)) %>% dplyr::select(-loan_paid_back)
 ```
 
 In this section, we will apply following three functions that I have created to derive new variables:
 
-- **Binning of numeric variables**: Quantile for skewed continuous variables and fixed binning for normally distributed continuous variables
+- **Rounding of numeric variables**: Rounding of key numeric variables
 - **Interaction variables**: Interaction between key numeric and factor variables
 - **Aggregated encoding**: Encoding of all variables in original dataset using aggregate statistics like mean and count 
 
@@ -526,83 +526,119 @@ test_fe <- final_fe[[2]]
 
 # Save datasets
 save(train_fe, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_fe.Rdata")
-
 save(test_fe, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_fe.Rdata")
 ```
 
-```{r comp}
+This is our final round of feature engineering for XGBoost. We will be performing following set of feature engineering techniques:
 
+- **High Signal Encoding of Categorical Variables**: Using high signal variables like **DTI** and **Employment Status** to encode categorical variables.
+- **Quantile Binning of Numeric Variables**: Perform quantile binning of numeric variables and create interaction between them.
+- **EDA-based interaction**: Create interaction variables based on our EDA.
+- **Loan to Income Ratio**: Derive LTI ratio
+- **Aggregate encoding using high signal variables**: Previously we did using original dataset variables, this time we will do the same with high signal variables.
+- **Frequency encoding of categorical variables**: For each categorial variable, we will find count of each value.
+- **Linear regression embeddings of one hot encoded categroical variables**: Perform linear regression on OHE categorical variables
 
-# Compare tables
-inter <- colnames(train_fe %>% dplyr::select(starts_with("inter_")))
-round <- colnames(train_fe %>% dplyr::select(starts_with("round_")))
-orign <- colnames(train_fe %>% dplyr::select(starts_with("orig_")))
+```{r adv_fe_2}
+# Derive Loan to Income Ratio
+train_fe_v2 <- train_fe %>% mutate(
+                                lti = loan_amount/annual_income,
+                                total_debt_burden = (loan_amount*interest_rate/100)/(annual_income)+1)
+test_fe_v2 <- test_fe %>% mutate(
+                                lti = loan_amount/annual_income,
+                                total_debt_burden = (loan_amount*interest_rate/100)/(annual_income)+1)
 
+# Create Working Flag
+train_fe_v2$working_flag <- ifelse(train_fe_v2$employment_status %in% c("Retired", "Employed", "Self-employed"),1 ,0)
+test_fe_v2$working_flag <- ifelse(test_fe_v2$employment_status %in% c("Retired", "Employed", "Self-employed"),1 ,0)
 
+# Convert to factors
+train_fe_v2[, working_flag := factor(working_flag, levels = c(0, 1))]
+test_fe_v2[, working_flag := factor(working_flag, levels = c(0, 1))]
 
-kaggle <- fread("/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_preproc_v3.csv")
-str(kaggle)
-identical(dt_train, kaggle)
-
-#INTER
-DT1 <- kaggle[,.SD, .SDcols = inter]
-DT2 <- train_fe[,.SD, .SDcols = inter]
-
-compare_cols <- data.table::data.table(
-  column = names(DT1),
-  class_DT1 = sapply(DT1, class),
-  class_DT2 = sapply(DT2, class),
-  same_class = sapply(DT1, class) == sapply(DT2, class),
-  identical_col = sapply(names(DT1), function(col) all.equal(DT1[[col]], DT2[[col]])),
-  unique_DT1 = sapply(DT1, function(x) length(unique(x))),
-  unique_DT2 = sapply(DT2, function(x) length(unique(x)))
+# Derive variables based on grade sub_grade
+# Merge Sub-grades to Grades using ordinal factor conversion
+train_fe_v2$grade <- str_sub(train_fe_v2$grade_subgrade, 1, 1)
+train_fe_v2$grade <- factor(
+  train_fe_v2$grade,
+  levels = c("A", "B", "C", "D", "E", "F"),
+  labels = c(6,5,4,3,2,1),
+  ordered = FALSE
 )
 
-compare_cols
-
-# Find mismatch
-find_mismatches <- function(DT1, DT2, col) {
-  idx <- DT1[[col]] != DT2[[col]] | (is.na(DT1[[col]]) != is.na(DT2[[col]]))
-  mism <- data.table::data.table(
-    row = which(idx),
-    DT1_value = DT1[[col]][idx],
-    DT2_value = DT2[[col]][idx]
-  )
-  return(mism)
-}
-
-mism <- find_mismatches(DT1, DT2, "inter_interest_rate_gender")
-head(mism, 20)
-nrow(mism)
-
-
-# ORIG
-DT1 <- kaggle[,.SD, .SDcols = orign]
-DT2 <- train_fe[,.SD, .SDcols = orign]
-
-compare_cols <- data.table::data.table(
-  column = names(DT1),
-  class_DT1 = sapply(DT1, class),
-  class_DT2 = sapply(DT2, class),
-  same_class = sapply(DT1, class) == sapply(DT2, class),
-  identical_col = sapply(names(DT1), function(col) all.equal(DT1[[col]], DT2[[col]])),
-  unique_DT1 = sapply(DT1, function(x) length(unique(x))),
-  unique_DT2 = sapply(DT2, function(x) length(unique(x)))
+train_fe_v2$subgrade <- str_sub(train_fe_v2$grade_subgrade, 2, 2)
+train_fe_v2$subgrade <- factor(
+  train_fe_v2$subgrade,
+  levels = c("1", "2", "3", "4", "5", "6"),
+  labels = c(1,2,3,4,5,6),
+  ordered = FALSE
 )
 
-compare_cols
-
-# ROUND
-DT1 <- kaggle[,.SD, .SDcols = round]
-DT2 <- train_fe[,.SD, .SDcols = round]
-
-compare_cols <- data.table::data.table(
-  column = names(DT1),
-  class_DT1 = sapply(DT1, class),
-  class_DT2 = sapply(DT2, class),
-  same_class = sapply(DT1, class) == sapply(DT2, class),
-  identical_col = sapply(names(DT1), function(col) all.equal(DT1[[col]], DT2[[col]])),
-  unique_DT1 = sapply(DT1, function(x) length(unique(x))),
-  unique_DT2 = sapply(DT2, function(x) length(unique(x)))
+test_fe_v2$grade <- str_sub(test_fe_v2$grade_subgrade, 1, 1)
+test_fe_v2$grade <- factor(
+  test_fe_v2$grade,
+  levels = c("A", "B", "C", "D", "E", "F"),
+  labels = c(6,5,4,3,2,1),
+  ordered = FALSE
 )
+
+test_fe_v2$subgrade <- str_sub(test_fe_v2$grade_subgrade, 2, 2)
+test_fe_v2$subgrade <- factor(
+  test_fe_v2$subgrade,
+  levels = c("1", "2", "3", "4", "5", "6"),
+  labels = c(1,2,3,4,5,6),
+  ordered = FALSE
+)
+
+dt_list <- list(train_fe_v2, test_fe_v2)
+
+# Perform frequency encoding of categorical variables
+source("/workspace/Projects/kaggle-credit-risk-s5e11/helpR_funcs/frequency_encoding.R")
+cat_vars <- c("grade", "subgrade", "employment_status", "education_level", "loan_purpose", "education_level", "marital_status", "gender")
+freq_enc_train <- frequency_encoding(train_fe_v2, cat_vars)
+freq_enc_test <- frequency_encoding(test_fe_v2, cat_vars)
+
+train_fe_v2 <- freq_enc_train$dt
+test_fe_v2 <- freq_enc_train$dt
+
+# Perform high signal encoding of categorical variables 
+source("/workspace/Projects/kaggle-credit-risk-s5e11/helpR_funcs/high_signal_encode.R")
+factors <- colnames(train[, .SD, .SDcols = is.character])
+high_signal_vars <- c("debt_to_income_ratio", "working_flag")
+hs_enc <- high_signal_encode(dt_list, factors, high_signal_vars)
+
+train_fe_v2 <- hs_enc$train
+test_fe_v2 <- hs_enc$test
+
+# Perform quantile binning of numeric variables
+source("/workspace/Projects/kaggle-credit-risk-s5e11/helpR_funcs/quantile_binning_numeric.R")
+numeric <- setdiff(union(colnames(train[, .SD, .SDcols = is.numeric]), "lti"), c(id, "grade", target, "working_flag"))
+qb_fe_train <- quantile_binning_numeric(train_fe_v2, numeric)
+qb_fe_test <- quantile_binning_numeric(test_fe_v2, numeric)
+
+train_fe_v2 <- qb_fe_train$dt
+test_fe_v2 <- qb_fe_test$dt
+
+# Perform interaction between numeric variables
+source("/workspace/Projects/kaggle-credit-risk-s5e11/helpR_funcs/numeric_interactions.R")
+num_int_fe_train <- numeric_interactions(train_fe_v2, numeric)
+num_int_fe_test <- numeric_interactions(test_fe_v2, numeric)
+
+train_fe_v2 <- num_int_fe_train$dt
+test_fe_v2 <- num_int_fe_test$dt
+
+# Perform high signal aggregate encoding of categorical variables 
+source("/workspace/Projects/kaggle-credit-risk-s5e11/helpR_funcs/high_signal_agg_encode.R")
+dt_list <- list(train_fe_v2, test_fe_v2)
+hs_agg_enc <- high_signal_agg_encode(dt_list, factors, high_signal_vars)
+
+train_fe_v2 <- hs_agg_enc$train
+test_fe_v2 <- hs_agg_enc$test
+
+# Final list of engineering variables in this phase
+fe_features_v2 <- unique(c(hs_enc$new_features, qb_fe_train$bin_features, qb_fe_train$int_features, num_int_fe_train$interaction_features, hs_agg_enc$new_features))
+
+# Save datasets
+save(train_fe_v2, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/train_fe_v2.Rdata")
+save(test_fe_v2, file = "/workspace/Projects/kaggle-credit-risk-s5e11/data/processed/test_fe_v2.Rdata")
 ```
